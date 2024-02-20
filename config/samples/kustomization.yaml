@@ -1,0 +1,7 @@
+## Append samples of your project ##
+resources:
+- infrastructure_v1beta1_k3kcluster.yaml
+- infrastructure_v1beta1_k3kmachine.yaml
+- controlplane_v1beta1_k3kcontrolplane.yaml
+- bootstrap_v1beta1_k3kconfigtemplate.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

@@ -1,0 +1,112 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: k3kclusters.infrastructure.cluster.x-k8s.io
+spec:
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    kind: K3kCluster
+    listKind: K3kClusterList
+    plural: k3kclusters
+    singular: k3kcluster
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: K3kCluster is the Schema for the k3kclusters API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: K3kClusterSpec defines the desired state of K3kCluster
+            properties:
+              expose:
+                description: Expose is the config used to expose a k3k cluster outside
+                  of the host cluster.
+                properties:
+                  ingress:
+                    properties:
+                      enabled:
+                        type: boolean
+                      ingressClassName:
+                        type: string
+                    required:
+                    - enabled
+                    - ingressClassName
+                    type: object
+                  loadbalancer:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  nodePort:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                required:
+                - ingress
+                - loadbalancer
+                - nodePort
+                type: object
+              hostKubeconfig:
+                description: |-
+                  HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k
+                  cluster should install in.
+                properties:
+                  secretName:
+                    type: string
+                  secretNamespace:
+                    type: string
+                required:
+                - secretName
+                - secretNamespace
+                type: object
+              persistence:
+                description: Persistence is the configuration used to persist k3k
+                  data accross potential reboots.
+                properties:
+                  storageClassName:
+                    type: string
+                  storageRequestSize:
+                    type: string
+                  type:
+                    description: Type can be ephermal, static, dynamic
+                    type: string
+                required:
+                - type
+                type: object
+            required:
+            - hostKubeconfig
+            type: object
+          status:
+            description: K3kClusterStatus defines the observed state of K3kCluster
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,12 @@
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: K3kConfigTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: k3kconfigtemplate
+    app.kubernetes.io/instance: k3kconfigtemplate-sample
+    app.kubernetes.io/part-of: capi-k3k
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: capi-k3k
+  name: k3kconfigtemplate-sample
+spec:
+  # TODO(user): Add fields here
