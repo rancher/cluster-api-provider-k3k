@@ -39,40 +39,153 @@ spec:
           spec:
             description: K3kControlPlaneSpec defines the desired state of K3kControlPlane
             properties:
-              addons:
-                description: Addons are the addons which will also be deployed on
-                  the cluster.
-                items:
-                  properties:
-                    secretNamespace:
+              clusterSpec:
+                description: ClusterSpec is the spec of the k3k cluster that should
+                  be deployed
+                properties:
+                  addons:
+                    items:
+                      properties:
+                        secretNamespace:
+                          type: string
+                        secretRef:
+                          type: string
+                      type: object
+                    type: array
+                  agentArgs:
+                    items:
                       type: string
-                    secretRef:
+                    type: array
+                  agents:
+                    format: int32
+                    type: integer
+                  clusterCIDR:
+                    type: string
+                  clusterDNS:
+                    type: string
+                  expose:
+                    properties:
+                      ingress:
+                        properties:
+                          enabled:
+                            type: boolean
+                          ingressClassName:
+                            type: string
+                        required:
+                        - enabled
+                        - ingressClassName
+                        type: object
+                      loadbalancer:
+                        properties:
+                          enabled:
+                            type: boolean
+                        required:
+                        - enabled
+                        type: object
+                      nodePort:
+                        properties:
+                          enabled:
+                            type: boolean
+                        required:
+                        - enabled
+                        type: object
+                    required:
+                    - ingress
+                    - loadbalancer
+                    - nodePort
+                    type: object
+                  persistence:
+                    properties:
+                      storageClassName:
+                        type: string
+                      storageRequestSize:
+                        type: string
+                      type:
+                        description: Type can be ephermal, static, dynamic
+                        type: string
+                    required:
+                    - type
+                    type: object
+                  serverArgs:
+                    items:
                       type: string
-                  type: object
-                type: array
-              clusterCIDR:
-                description: ClusterCIDR is the CIDR for the cluster.
-                type: string
-              clusterDNS:
-                description: ClusterDNS is the cluster DNS.
-                type: string
-              serviceCIDR:
-                description: ServiceCIDR is the CIDR for the services.
-                type: string
-              tlsSANs:
-                description: TLSSANs is the SANs for the TLS cert the cluster will
-                  use.
-                items:
-                  type: string
-                type: array
-              version:
-                description: Version is the k8s version of the k3k cluster.
-                type: string
+                    type: array
+                  servers:
+                    format: int32
+                    type: integer
+                  serviceCIDR:
+                    type: string
+                  tlsSANs:
+                    items:
+                      type: string
+                    type: array
+                  token:
+                    type: string
+                  version:
+                    type: string
+                required:
+                - agents
+                - servers
+                - token
+                - version
+                type: object
+              hostKubeconfig:
+                description: |-
+                  HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k cluster should install in.
+                  Optional, if not supplied the k3k cluster will be made in the current cluster.
+                properties:
+                  secretName:
+                    type: string
+                  secretNamespace:
+                    type: string
+                required:
+                - secretName
+                - secretNamespace
+                type: object
             required:
-            - version
+            - clusterSpec
             type: object
           status:
             description: K3kControlPlaneStatus defines the observed state of K3kControlPlane
+            properties:
+              clusterStatus:
+                properties:
+                  clusterCIDR:
+                    type: string
+                  clusterDNS:
+                    type: string
+                  persistence:
+                    properties:
+                      storageClassName:
+                        type: string
+                      storageRequestSize:
+                        type: string
+                      type:
+                        description: Type can be ephermal, static, dynamic
+                        type: string
+                    required:
+                    - type
+                    type: object
+                  serviceCIDR:
+                    type: string
+                  tlsSANs:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              externalManagedControlPlane:
+                description: ExternalManagedControlPlane will always be true in the
+                  current implementation
+                type: boolean
+              initialized:
+                type: boolean
+              ready:
+                type: boolean
+            required:
+            - clusterStatus
+            - externalManagedControlPlane
+            - initialized
+            - ready
             type: object
         type: object
     served: true

@@ -26,27 +26,25 @@ import (
 
 // K3kControlPlaneSpec defines the desired state of K3kControlPlane
 type K3kControlPlaneSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k cluster should install in.
+	// Optional, if not supplied the k3k cluster will be made in the current cluster.
+	HostKubeconfig *HostKubeconfigLocation `json:"hostKubeconfig,omitempty"`
+	// ClusterSpec is the spec of the k3k cluster that should be deployed
+	ClusterSpec upstream.ClusterSpec `json:"clusterSpec"`
+}
 
-	// Version is the k8s version of the k3k cluster.
-	Version string `json:"version"`
-	// ClusterCIDR is the CIDR for the cluster.
-	ClusterCIDR string `json:"clusterCIDR,omitempty"`
-	// ServiceCIDR is the CIDR for the services.
-	ServiceCIDR string `json:"serviceCIDR,omitempty"`
-	// ClusterDNS is the cluster DNS.
-	ClusterDNS string `json:"clusterDNS,omitempty"`
-	// TLSSANs is the SANs for the TLS cert the cluster will use.
-	TLSSANs []string `json:"tlsSANs,omitempty"`
-	// Addons are the addons which will also be deployed on the cluster.
-	Addons []upstream.Addon `json:"addons,omitempty"`
+type HostKubeconfigLocation struct {
+	SecretName      string `json:"secretName"`
+	SecretNamespace string `json:"secretNamespace"`
 }
 
 // K3kControlPlaneStatus defines the observed state of K3kControlPlane
 type K3kControlPlaneStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Initialized bool `json:"initialized"`
+	Ready       bool `json:"ready"`
+	// ExternalManagedControlPlane will always be true in the current implementation
+	ExternalManagedControlPlane bool                   `json:"externalManagedControlPlane"`
+	ClusterStatus               upstream.ClusterStatus `json:"clusterStatus"`
 }
 
 //+kubebuilder:object:root=true

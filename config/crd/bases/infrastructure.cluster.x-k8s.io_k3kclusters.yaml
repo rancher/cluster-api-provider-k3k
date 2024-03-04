@@ -38,69 +38,6 @@ spec:
             type: object
           spec:
             description: K3kClusterSpec defines the desired state of K3kCluster
-            properties:
-              expose:
-                description: Expose is the config used to expose a k3k cluster outside
-                  of the host cluster.
-                properties:
-                  ingress:
-                    properties:
-                      enabled:
-                        type: boolean
-                      ingressClassName:
-                        type: string
-                    required:
-                    - enabled
-                    - ingressClassName
-                    type: object
-                  loadbalancer:
-                    properties:
-                      enabled:
-                        type: boolean
-                    required:
-                    - enabled
-                    type: object
-                  nodePort:
-                    properties:
-                      enabled:
-                        type: boolean
-                    required:
-                    - enabled
-                    type: object
-                required:
-                - ingress
-                - loadbalancer
-                - nodePort
-                type: object
-              hostKubeconfig:
-                description: |-
-                  HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k
-                  cluster should install in.
-                properties:
-                  secretName:
-                    type: string
-                  secretNamespace:
-                    type: string
-                required:
-                - secretName
-                - secretNamespace
-                type: object
-              persistence:
-                description: Persistence is the configuration used to persist k3k
-                  data accross potential reboots.
-                properties:
-                  storageClassName:
-                    type: string
-                  storageRequestSize:
-                    type: string
-                  type:
-                    description: Type can be ephermal, static, dynamic
-                    type: string
-                required:
-                - type
-                type: object
-            required:
-            - hostKubeconfig
             type: object
           status:
             description: K3kClusterStatus defines the observed state of K3kCluster

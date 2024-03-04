@@ -25,6 +25,9 @@ resources:
 #- ../certmanager
 # [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'.
 #- ../prometheus
+#
+commonLabels:
+  cluster.x-k8s.io/provider: k3k
 
 patches:
 # Protect the /metrics endpoint by putting it behind auth.

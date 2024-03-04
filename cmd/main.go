@@ -34,12 +34,13 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	bootstrapv1beta1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/bootstrap/v1beta1"
 	controlplanev1beta1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1beta1"
 	infrastructurev1beta1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1beta1"
 	"github.com/mbolotsuse/cluster-api-provider-k3k/internal/controller"
-	bootstrapcontroller "github.com/mbolotsuse/cluster-api-provider-k3k/internal/controller/bootstrap"
 	controlplanecontroller "github.com/mbolotsuse/cluster-api-provider-k3k/internal/controller/controlplane"
+	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
+	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -53,8 +54,10 @@ func init() {
 
 	utilruntime.Must(infrastructurev1beta1.AddToScheme(scheme))
 	utilruntime.Must(controlplanev1beta1.AddToScheme(scheme))
-	utilruntime.Must(bootstrapv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+	utilruntime.Must(upstream.AddToScheme(scheme))
+	utilruntime.Must(clusterv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1alpha4.AddToScheme(scheme))
 }
 
 func main() {
@@ -147,13 +150,6 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "K3kControlPlane")
-		os.Exit(1)
-	}
-	if err = (&bootstrapcontroller.K3kConfigTemplateReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "K3kConfigTemplate")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

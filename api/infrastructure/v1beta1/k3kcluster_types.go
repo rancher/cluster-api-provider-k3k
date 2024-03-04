@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,27 +25,15 @@ import (
 
 // K3kClusterSpec defines the desired state of K3kCluster
 type K3kClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k
-	// cluster should install in.
-	HostKubeconfig HostKubeconfigLocation `json:"hostKubeconfig"`
-	// Persistence is the configuration used to persist k3k data accross potential reboots.
-	Persistence *upstream.PersistenceConfig `json:"persistence,omitempty"`
-	// Expose is the config used to expose a k3k cluster outside of the host cluster.
-	Expose *upstream.ExposeConfig `json:"expose,omitempty"`
-}
-
-type HostKubeconfigLocation struct {
-	SecretName      string `json:"secretName"`
-	SecretNamespace string `json:"secretNamespace"`
+	// ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
+	// time by the end user, the controller will fill this in when provisioning is complete.
+	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
 }
 
 // K3kClusterStatus defines the observed state of K3kCluster
 type K3kClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Ready is true when the cluster is ready to be used
+	Ready bool `json:"ready"`
 }
 
 //+kubebuilder:object:root=true

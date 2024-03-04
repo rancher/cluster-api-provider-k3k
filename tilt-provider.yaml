@@ -1,0 +1,6 @@
+name: k3k
+config:
+  image: "controller:latest"
+  live_reload_deps: ["main.go", "go.mod", "go.sum", "api", "cmd", "internal", "pkg"]
+  label: CAPK3K
+  go_main: cmd/main.go
