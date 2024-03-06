@@ -38,9 +38,32 @@ spec:
             type: object
           spec:
             description: K3kClusterSpec defines the desired state of K3kCluster
+            properties:
+              controlPlaneEndpoint:
+                description: |-
+                  ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
+                  time by the end user, the controller will fill this in when provisioning is complete.
+                properties:
+                  host:
+                    type: string
+                  port:
+                    format: int32
+                    type: integer
+                required:
+                - host
+                - port
+                type: object
+            required:
+            - controlPlaneEndpoint
             type: object
           status:
             description: K3kClusterStatus defines the observed state of K3kCluster
+            properties:
+              ready:
+                description: Ready is true when the cluster is ready to be used
+                type: boolean
+            required:
+            - ready
             type: object
         type: object
     served: true
