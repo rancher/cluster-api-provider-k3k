@@ -33,9 +33,11 @@ import (
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/retry"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -118,19 +120,26 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("controlplane wasn't deleting, but we didn't reconcile the cluster")
 	}
 	ctrl.Log.Info("Reconciled upstream cluster for controlPlane", "upstreamCluster", upstreamCluster, "controlPlane", k3kControlPlane.Name)
-	kubeconfig, err := r.getKubeconfig(ctx, *upstreamCluster)
-	if apiError.IsNotFound(err) || kubeconfig == nil {
-		// TODO: Right now we re-enqueue the whole object to wait for the kubeconfig. This is probably quite inefficient, and stops us
-		// from breaking after a long time has passed
-		ctrl.Log.Info("Kubeconfig secret not found yet for cluster, re-enqueueing", "clusterName", upstreamCluster.Name, "secretError", err)
-		return ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: time.Second * 5,
-		}, nil
-	} else if err != nil {
+
+	backoff := wait.Backoff{
+		Steps:    5,
+		Duration: 20 * time.Second,
+		Factor:   2,
+		Jitter:   0.1,
+	}
+	var kubeconfig *clientcmdapi.Config
+	var retryErr error
+	if err := retry.OnError(backoff, apiError.IsNotFound, func() error {
+		kubeconfig, retryErr = r.getKubeconfig(ctx, *upstreamCluster)
+		if retryErr != nil {
+			return retryErr
+		}
+		return nil
+	}); err != nil {
 		ctrl.Log.Error(err, "Hard failure when getting kubeconfig for cluster", "clusterName", upstreamCluster.Name)
 		return ctrl.Result{}, fmt.Errorf("unable to get kubeconfig secret")
 	}
+
 	err = r.createKubeconfigSecret(ctx, *kubeconfig, k3kControlPlane)
 	if err != nil {
 		ctrl.Log.Error(err, "Unable to store kubeconfig as a secret")
