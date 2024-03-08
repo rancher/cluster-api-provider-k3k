@@ -31,6 +31,8 @@ type K3kControlPlaneSpec struct {
 	HostKubeconfig *HostKubeconfigLocation `json:"hostKubeconfig,omitempty"`
 	// ClusterSpec is the spec of the k3k cluster that should be deployed
 	ClusterSpec upstream.ClusterSpec `json:"clusterSpec"`
+	// Version is a string representing the Kubernetes version to be used by the virtual nodes.
+	Version string `json:"version"`
 }
 
 type HostKubeconfigLocation struct {

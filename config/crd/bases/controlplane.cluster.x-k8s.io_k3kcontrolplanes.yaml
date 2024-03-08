@@ -142,8 +142,13 @@ spec:
                 - secretName
                 - secretNamespace
                 type: object
+              version:
+                description: Version is a string representing the Kubernetes version
+                  to be used by the virtual nodes.
+                type: string
             required:
             - clusterSpec
+            - version
             type: object
           status:
             description: K3kControlPlaneStatus defines the observed state of K3kControlPlane
