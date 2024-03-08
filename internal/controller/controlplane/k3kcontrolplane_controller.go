@@ -70,7 +70,7 @@ type K3kControlPlaneReconciler struct {
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters/status,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
-//+kubebuilder:rbac:groups=k3k.io,resources=clusters,verbs=get;list;watch;create;update
+//+kubebuilder:rbac:groups=k3k.io,resources=clusters,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
 
@@ -87,8 +87,12 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("unable to get controlplane for request %w", err)
 	}
 	if !k3kControlPlane.DeletionTimestamp.IsZero() {
-		err := r.removeUpstreamClusters(ctx, k3kControlPlane)
-		return ctrl.Result{}, err
+		ctrl.Log.Info("About to remove upstream cluster")
+		if err := r.removeUpstreamClusters(ctx, k3kControlPlane); err != nil {
+			ctrl.Log.Error(err, "Couldn't remove upstream cluster")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 	// we re-enqueue and take no action if we don't have a cluster owner
 	capiClusterOwner, err := r.getClusterOwner(ctx, k3kControlPlane)
@@ -244,15 +248,20 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 
 // removeUpstreamClusters removes all upstream clusters associated with this controlPlane and removes the finalizer on the controlPlane
 func (r *K3kControlPlaneReconciler) removeUpstreamClusters(ctx context.Context, controlPlane controlplane.K3kControlPlane) error {
+	ctrl.Log.Info("In removeUpstreamClusters")
 	clusters, err := r.getUpstreamClusters(ctx, controlPlane)
 	if err != nil {
 		return fmt.Errorf("unable to get current clusters for controlPlane %s/%s: %w", controlPlane.Namespace, controlPlane.Name, err)
 	}
-	var deleteErr error
+	ctrl.Log.Info("Need to delete " + strconv.Itoa(len(clusters)) + " clusters")
+	var deleteErrs []error
 	for _, cluster := range clusters {
-		errors.Join(deleteErr, r.Delete(ctx, &cluster))
+		if err := r.Delete(ctx, &cluster); err != nil {
+			ctrl.Log.Error(err, "Failed to delete upstream cluster")
+			deleteErrs = append(deleteErrs, err)
+		}
 	}
-	if deleteErr != nil {
+	if err := errors.Join(deleteErrs...); err != nil {
 		return fmt.Errorf("unable to delete all upstream clusters: %w", err)
 	}
 	controllerutil.RemoveFinalizer(&controlPlane, finalizer)
@@ -260,6 +269,7 @@ func (r *K3kControlPlaneReconciler) removeUpstreamClusters(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("unable to update k3k controlplane finalizer after removing clusters: %w", err)
 	}
+	ctrl.Log.Info("Deleted clusters in removeUpstreamClusters")
 	return nil
 }
 
