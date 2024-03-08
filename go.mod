@@ -8,6 +8,7 @@ require (
 	github.com/rancher/k3k v0.2.1-0.20240215215959-cc914cf8705e
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
+	k8s.io/apiserver v0.29.0
 	k8s.io/client-go v0.29.0
 	sigs.k8s.io/cluster-api v1.6.2
 	sigs.k8s.io/controller-runtime v0.17.0

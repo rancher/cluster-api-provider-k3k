@@ -33,6 +33,7 @@ import (
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
@@ -277,6 +278,7 @@ func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamC
 	// TODO: We set the expiry to one year here, but we need to continually keep this up to date
 	cfg := kubeconfig.KubeConfig{
 		CN:         util.AdminCommonName,
+		ORG:        []string{user.SystemPrivilegedGroup},
 		ExpiryDate: time.Hour * 24 * 365,
 	}
 	restConfig, err := ctrl.GetConfig()
