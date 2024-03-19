@@ -60,6 +60,12 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: configure-local
+configure-local: 
+	sed -i "5 s,controller:latest,$(TEST_IMAGE),g" Makefile
+	sed -i "s,controller:latest,$(TEST_IMAGE),g" config/manager/manager.yaml 
+	sed -i "s,controller:latest,$(TEST_IMAGE),g" tilt-provider.yaml
+
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
