@@ -1,8 +1,10 @@
 # capi-k3k
-// TODO(user): Add simple overview of use/purpose
+
+A cluster-api provider for [k3k](https://github.com/rancher/k3k).
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+This project aims to allow the provisioning/management of a k3k cluster using CAPI.
 
 ## Getting Started
 
@@ -11,90 +13,74 @@
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
+- tilt version v0.33.11+. 
+- helm version v3.12.0+.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+### Install/Run Development branch
 
-```sh
-make docker-build docker-push IMG=<some-registry>/capi-k3k:tag
+Follow the [upstream docs](https://cluster-api.sigs.k8s.io/developer/tilt) to setup the project to run locally. The basic steps are repeated here for clarity.
+
+Install tilt. Deploy/configure a cluster. The upstream docs use KIND. If using k3d, do the following:
+
+1. Create a local registry (necessary to avoid pushing to a remote repo frequently).
+```bash
+k3d registry create
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified. 
-And it is required to have access to pull the image from the working environment. 
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
-
-```sh
-make install
+2. Retrieve the image name and port using docker.
+```bash
+## Look for a "k3d-registry" container
+docker ps 
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/capi-k3k:tag
+3. Create a cluster using the registry. It's also recommended to use the `--image` parameter to deploy a recent k3s version.
+```bash
+k3d cluster create --registry-use $CONTAINER_NAME:$PORT --image rancher/k3s:v1.28.7-k3s1
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin 
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
+4. Configure the project to use the local registry.
+```bash
+make configure-local TEST_IMAGE=$CONTAINER_NAME:PORT/controller:latest
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+5. Clone the upstream [capi](https://github.com/kubernetes-sigs/cluster-api) project. In your local copy of the project, paste the following into `tilt-settings.yaml`:
+```yaml
+provider_repos:
+- ../cluster-api-provider-k3k
+enable_providers:
+- k3k
+allowed_contexts:
+- k3d-k3s-default 
+```
+Some notes:
+- The above assumes that the upstream capi project is in the same folder as the cluster-api-provider-k3k project. If that isn't true, adjust the path in `provider_repos`.
+- `allowed_contexts` controlls which contexts tilt is able to use to deploy resources. This needs to point to a context for an admin account on the cluster created in step 3. You may need to change this value depending on your current kubeconfig structure.
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+6. Install the upstream [k3k project](https://github.com/rancher/k3k?tab=readme-ov-file#usage) into the cluster created in step 3:
 
-```sh
-kubectl delete -k config/samples/
+```
+helm repo add k3k https://rancher.github.io/k3k && helm repo update
+helm install my-k3k k3k/k3k --devel
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
+7. In the local copy of the **upstream project** (meaning the project cloned in step 5), run tilt:
+```
+tilt up
 ```
 
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
+Some notes on running the project:
+- Most changes will cause tilt to automatically re-build/push the image. However, if you are changing a value included as part of the chart (such as RBAC, or CRD structure), this may require you to do the following:
+  - Stop tilt.
+  - In the project repo (for cluster-api-provider-k3k) regenerate the CRDs and charts (`make generate && make manifests`).
+  - Start tilt.
 
 ## Project Distribution
 
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/capi-k3k:tag
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/capi-k3k/<tag or branch>/dist/install.yaml
-```
+TODO: This project is in an unreleased, alpha state. As of now, there are no releases, or a supported way to install the project other than the dev setup documented above.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+All changes should have an issue attached to them, and should have tests (where appropriate).
 
 ## License
 
