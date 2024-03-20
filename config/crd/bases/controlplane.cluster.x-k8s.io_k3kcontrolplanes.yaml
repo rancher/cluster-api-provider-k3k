@@ -39,95 +39,56 @@ spec:
           spec:
             description: K3kControlPlaneSpec defines the desired state of K3kControlPlane
             properties:
-              clusterSpec:
-                description: ClusterSpec is the spec of the k3k cluster that should
-                  be deployed
+              addons:
+                items:
+                  properties:
+                    secretNamespace:
+                      type: string
+                    secretRef:
+                      type: string
+                  type: object
+                type: array
+              agentArgs:
+                items:
+                  type: string
+                type: array
+              agents:
+                format: int32
+                type: integer
+              clusterCIDR:
+                type: string
+              clusterDNS:
+                type: string
+              expose:
                 properties:
-                  addons:
-                    items:
-                      properties:
-                        secretNamespace:
-                          type: string
-                        secretRef:
-                          type: string
-                      type: object
-                    type: array
-                  agentArgs:
-                    items:
-                      type: string
-                    type: array
-                  agents:
-                    format: int32
-                    type: integer
-                  clusterCIDR:
-                    type: string
-                  clusterDNS:
-                    type: string
-                  expose:
+                  ingress:
                     properties:
-                      ingress:
-                        properties:
-                          enabled:
-                            type: boolean
-                          ingressClassName:
-                            type: string
-                        required:
-                        - enabled
-                        - ingressClassName
-                        type: object
-                      loadbalancer:
-                        properties:
-                          enabled:
-                            type: boolean
-                        required:
-                        - enabled
-                        type: object
-                      nodePort:
-                        properties:
-                          enabled:
-                            type: boolean
-                        required:
-                        - enabled
-                        type: object
-                    required:
-                    - ingress
-                    - loadbalancer
-                    - nodePort
-                    type: object
-                  persistence:
-                    properties:
-                      storageClassName:
-                        type: string
-                      storageRequestSize:
-                        type: string
-                      type:
-                        description: Type can be ephermal, static, dynamic
+                      enabled:
+                        type: boolean
+                      ingressClassName:
                         type: string
                     required:
-                    - type
+                    - enabled
+                    - ingressClassName
                     type: object
-                  serverArgs:
-                    items:
-                      type: string
-                    type: array
-                  servers:
-                    format: int32
-                    type: integer
-                  serviceCIDR:
-                    type: string
-                  tlsSANs:
-                    items:
-                      type: string
-                    type: array
-                  token:
-                    type: string
-                  version:
-                    type: string
+                  loadbalancer:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  nodePort:
+                    properties:
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
                 required:
-                - agents
-                - servers
-                - token
-                - version
+                - ingress
+                - loadbalancer
+                - nodePort
                 type: object
               hostKubeconfig:
                 description: |-
@@ -142,12 +103,41 @@ spec:
                 - secretName
                 - secretNamespace
                 type: object
+              persistence:
+                properties:
+                  storageClassName:
+                    type: string
+                  storageRequestSize:
+                    type: string
+                  type:
+                    description: Type can be ephermal, static, dynamic
+                    type: string
+                required:
+                - type
+                type: object
+              serverArgs:
+                items:
+                  type: string
+                type: array
+              servers:
+                format: int32
+                type: integer
+              serviceCIDR:
+                type: string
+              tlsSANs:
+                items:
+                  type: string
+                type: array
+              token:
+                type: string
               version:
                 description: Version is a string representing the Kubernetes version
                   to be used by the virtual nodes.
                 type: string
             required:
-            - clusterSpec
+            - agents
+            - servers
+            - token
             - version
             type: object
           status:
