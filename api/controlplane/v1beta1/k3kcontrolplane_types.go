@@ -29,8 +29,22 @@ type K3kControlPlaneSpec struct {
 	// HostKubeconfig is the location of the kubeconfig to the host cluster that the k3k cluster should install in.
 	// Optional, if not supplied the k3k cluster will be made in the current cluster.
 	HostKubeconfig *HostKubeconfigLocation `json:"hostKubeconfig,omitempty"`
-	// ClusterSpec is the spec of the k3k cluster that should be deployed
-	ClusterSpec upstream.ClusterSpec `json:"clusterSpec"`
+
+	// The following fields are copied from the github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1.ClusterSpec
+
+	Servers     *int32                      `json:"servers"`
+	Agents      *int32                      `json:"agents"`
+	Token       string                      `json:"token"`
+	ClusterCIDR string                      `json:"clusterCIDR,omitempty"`
+	ServiceCIDR string                      `json:"serviceCIDR,omitempty"`
+	ClusterDNS  string                      `json:"clusterDNS,omitempty"`
+	ServerArgs  []string                    `json:"serverArgs,omitempty"`
+	AgentArgs   []string                    `json:"agentArgs,omitempty"`
+	TLSSANs     []string                    `json:"tlsSANs,omitempty"`
+	Addons      []upstream.Addon            `json:"addons,omitempty"`
+	Persistence *upstream.PersistenceConfig `json:"persistence,omitempty"`
+	Expose      *upstream.ExposeConfig      `json:"expose,omitempty"`
+
 	// Version is a string representing the Kubernetes version to be used by the virtual nodes.
 	Version string `json:"version"`
 }
