@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package infrastructure
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	infrastructurev1beta1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1beta1"
+	infrastructurev1alpha1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 )
 
 var _ = Describe("K3kCluster Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("K3kCluster Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		k3kcluster := &infrastructurev1beta1.K3kCluster{}
+		k3kcluster := &infrastructurev1alpha1.K3kCluster{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind K3kCluster")
 			err := k8sClient.Get(ctx, typeNamespacedName, k3kcluster)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &infrastructurev1beta1.K3kCluster{
+				resource := &infrastructurev1alpha1.K3kCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("K3kCluster Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &infrastructurev1beta1.K3kCluster{}
+			resource := &infrastructurev1alpha1.K3kCluster{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

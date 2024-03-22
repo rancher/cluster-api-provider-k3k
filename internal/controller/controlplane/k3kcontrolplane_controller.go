@@ -47,8 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	controlplanev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1beta1"
-	infrastructurev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1beta1"
+	controlplanev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	infrastructurev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"

@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controlplanev1beta1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1beta1"
+	controlplanev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 )
 
 var _ = Describe("K3kControlPlane Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("K3kControlPlane Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		k3kcontrolplane := &controlplanev1beta1.K3kControlPlane{}
+		k3kcontrolplane := &controlplanev1.K3kControlPlane{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind K3kControlPlane")
 			err := k8sClient.Get(ctx, typeNamespacedName, k3kcontrolplane)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &controlplanev1beta1.K3kControlPlane{
+				resource := &controlplanev1.K3kControlPlane{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("K3kControlPlane Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &controlplanev1beta1.K3kControlPlane{}
+			resource := &controlplanev1.K3kControlPlane{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

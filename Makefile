@@ -62,7 +62,7 @@ vet: ## Run go vet against code.
 
 .PHONY: configure-local
 configure-local: 
-	sed -i "5 s,controller:latest,$(TEST_IMAGE),g" Makefile
+	sed -i "s,controller:latest$$,$(TEST_IMAGE),g" Makefile
 	sed -i "s,controller:latest,$(TEST_IMAGE),g" config/manager/manager.yaml 
 	sed -i "s,controller:latest,$(TEST_IMAGE),g" tilt-provider.yaml
 

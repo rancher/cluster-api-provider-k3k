@@ -3,15 +3,13 @@
 # It should be run by config/default
 resources:
 - bases/infrastructure.cluster.x-k8s.io_k3kclusters.yaml
-- bases/infrastructure.cluster.x-k8s.io_k3kmachines.yaml
 - bases/controlplane.cluster.x-k8s.io_k3kcontrolplanes.yaml
-- bases/bootstrap.cluster.x-k8s.io_k3kconfigtemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 commonLabels:
-  cluster.x-k8s.io/v1alpha2: v1beta1
-  cluster.x-k8s.io/v1alpha3: v1beta1
-  cluster.x-k8s.io/v1beta1: v1beta1
+  cluster.x-k8s.io/v1alpha2: v1alpha1
+  cluster.x-k8s.io/v1alpha3: v1alpha1
+  cluster.x-k8s.io/v1beta1: v1alpha1
 
 patches:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
@@ -20,6 +18,7 @@ patches:
 #- path: patches/webhook_in_k3kmachines.yaml
 #- path: patches/webhook_in_controlplane_k3kcontrolplanes.yaml
 #- path: patches/webhook_in_bootstrap_k3kconfigtemplates.yaml
+#- path: patches/webhook_in_infrastructure_k3kclusters.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -28,6 +27,7 @@ patches:
 #- path: patches/cainjection_in_k3kmachines.yaml
 #- path: patches/cainjection_in_controlplane_k3kcontrolplanes.yaml
 #- path: patches/cainjection_in_bootstrap_k3kconfigtemplates.yaml
+#- path: patches/cainjection_in_infrastructure_k3kclusters.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section
