@@ -4,3 +4,13 @@ config:
   live_reload_deps: ["main.go", "go.mod", "go.sum", "api", "cmd", "internal", "pkg"]
   label: CAPK3K
   go_main: cmd/main.go
+  additional_docker_helper_commands: |
+    ENV K3K_VERSION=0.1.4-r1
+    RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
+      gunzip k3k-${K3K_VERSION}.tgz && \
+      tar xvf k3k-${K3K_VERSION}.tar && \
+      mkdir -p /charts && \
+      mv k3k /charts/k3k
+  additional_docker_build_commands: |
+    ENV K3K_VERSION=0.1.4-r1
+    COPY --from=tilt-helper /charts /charts
