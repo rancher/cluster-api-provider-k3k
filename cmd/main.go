@@ -38,10 +38,10 @@ import (
 	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
-	controlplanev1alpha1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1alpha1"
-	infrastructurev1alpha1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
-	controlplanecontroller "github.com/mbolotsuse/cluster-api-provider-k3k/internal/controller/controlplane"
-	infrastructurecontroller "github.com/mbolotsuse/cluster-api-provider-k3k/internal/controller/infrastructure"
+	controlplanev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	controlplanecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/controlplane"
+	infrastructurecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/infrastructure"
 	//+kubebuilder:scaffold:imports
 )
 
