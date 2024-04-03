@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/mbolotsuse/cluster-api-provider-k3k/test/utils"
+	"github.com/rancher-sandbox/cluster-api-provider-k3k/test/utils"
 )
 
 const namespace = "capi-k3k-system"

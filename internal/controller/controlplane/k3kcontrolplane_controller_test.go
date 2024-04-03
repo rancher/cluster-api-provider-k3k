@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controlplanev1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 )
 
 var _ = Describe("K3kControlPlane Controller", func() {

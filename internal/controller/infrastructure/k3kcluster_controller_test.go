@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	infrastructurev1alpha1 "github.com/mbolotsuse/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 )
 
 var _ = Describe("K3kCluster Controller", func() {
