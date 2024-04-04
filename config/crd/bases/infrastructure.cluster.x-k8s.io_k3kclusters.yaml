@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: K3kCluster is the Schema for the k3kclusters API
+        description: K3kCluster is the Schema for the K3kclusters API
         properties:
           apiVersion:
             description: |-
@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: K3kClusterSpec defines the desired state of K3kCluster
+            description: Spec is the desired spec.
             properties:
               controlPlaneEndpoint:
                 description: |-
@@ -45,8 +45,10 @@ spec:
                   time by the end user, the controller will fill this in when provisioning is complete.
                 properties:
                   host:
+                    description: The hostname on which the API server is serving.
                     type: string
                   port:
+                    description: The port on which the API server is serving.
                     format: int32
                     type: integer
                 required:
@@ -57,10 +59,10 @@ spec:
             - controlPlaneEndpoint
             type: object
           status:
-            description: K3kClusterStatus defines the observed state of K3kCluster
+            description: Status is the current status.
             properties:
               ready:
-                description: Ready is true when the cluster is ready to be used
+                description: Ready is true when the cluster is ready to be used.
                 type: boolean
             required:
             - ready
