@@ -35,7 +35,6 @@ import (
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -70,7 +69,6 @@ const (
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
 type K3kControlPlaneReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
 	Helm       helm.Client
 	K3KVersion string
 }
@@ -88,6 +86,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 		return fmt.Errorf("failed setting up the K3kControlPlane controller manager: %w", err)
 	}
 
+	// enqueue K3kControlPlane when CAPI cluster changes
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
 		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &infrastructurev1.K3kCluster{})),
@@ -96,6 +95,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
 	}
 
+	// enqueue K3kControlPlane when K3kCluster changes
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &infrastructurev1.K3kCluster{}),
 		handler.EnqueueRequestsFromMapFunc(r.k3kClusterToK3kControlPlane(log)),
@@ -480,6 +480,11 @@ func controlPlaneOwnerRef(controlPlane *controlplanev1.K3kControlPlane) metav1.O
 	}
 }
 
+// k3kClusterToK3kControlPlane returns a handler.MapFunc for use in watch events, for re-enqueuing a
+// controlplanev1.K3kControlPlane object when it's related K3kCluster changes. This function returns a function which
+// will, if the input is a valid infrastructurev1.K3kCluster object, make sure it is not deleting, extract the
+// controlplane from the related CAPI Cluster's controlPlaneRef, and then return the namespace and name of the
+// controlplanev1.K3kControlplane within the ctrl.Request.
 func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger) handler.MapFunc {
 	return func(ctx context.Context, o client.Object) []ctrl.Request {
 		k3kCluster, ok := o.(*infrastructurev1.K3kCluster)
