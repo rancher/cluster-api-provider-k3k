@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiutil "sigs.k8s.io/cluster-api/util"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -155,6 +156,11 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	if capiannotations.IsPaused(cluster, k3kControlPlane) {
+		log.Info("Reconciliation is paused for this object")
+		return ctrl.Result{}, nil
+	}
+
 	scope := &scope{
 		Logger:          log,
 		k3kControlPlane: k3kControlPlane,
@@ -215,6 +221,7 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 		scope.Error(err, "Unable to get serverURL from kubeconfig")
 		return ctrl.Result{}, fmt.Errorf("unable to resolve server url")
 	}
+
 	err = r.updateCluster(ctx, serverURL, scope.cluster)
 	if err != nil {
 		scope.Error(err, "Unable to update capiCluster")
