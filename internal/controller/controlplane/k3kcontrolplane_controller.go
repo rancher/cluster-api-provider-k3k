@@ -41,6 +41,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/retry"
 	capiutil "sigs.k8s.io/cluster-api/util"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -125,6 +126,22 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, fmt.Errorf("unable to get controlplane for request %w", err)
 	}
+
+	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
+	}
+	if cluster == nil {
+		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
+		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
+		return ctrl.Result{}, nil
+	}
+
+	if capiannotations.IsPaused(cluster, &k3kControlPlane) {
+		log.Info("Reconciliation is paused for this object")
+		return ctrl.Result{}, nil
+	}
+
 	if !k3kControlPlane.DeletionTimestamp.IsZero() {
 		log.Info("About to remove upstream cluster")
 		if err := r.deleteUpstreamClusters(ctx, k3kControlPlane); err != nil {
@@ -133,19 +150,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, nil
 	}
-	// we re-enqueue and take no action if we don't have a cluster owner
-	capiClusterOwner, err := r.getClusterOwner(ctx, k3kControlPlane)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
-	}
-	if capiClusterOwner == nil {
-		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
-		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		return ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: time.Millisecond * 100,
-		}, nil
-	}
+
 	if !controllerutil.ContainsFinalizer(&k3kControlPlane, finalizer) {
 		controllerutil.AddFinalizer(&k3kControlPlane, finalizer)
 		err := r.Update(ctx, &k3kControlPlane)
@@ -192,7 +197,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Error(err, "Unable to get serverUrl from kubeconfig")
 		return ctrl.Result{}, fmt.Errorf("unable to resolve server url")
 	}
-	err = r.updateCluster(ctx, serverUrl, capiClusterOwner)
+	err = r.updateCluster(ctx, serverUrl, cluster)
 	if err != nil {
 		log.Error(err, "Unable to update capiCluster")
 		return ctrl.Result{}, fmt.Errorf("unable to update capi cluster")
@@ -209,32 +214,6 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 	return ctrl.Result{}, nil
-}
-
-// getClusterOwner retrieves the CAPI cluster owning this controlPlane. Returns an error if the cluster was specified by could not be retrieved.
-// can return nil, nil if no clusterOwner ref has been set yet
-func (r *K3kControlPlaneReconciler) getClusterOwner(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) (*clusterv1beta1.Cluster, error) {
-	var clusterKey *client.ObjectKey
-	for _, ownerRef := range controlPlane.OwnerReferences {
-		hasAPIVersion := ownerRef.APIVersion == clusterv1beta1.GroupVersion.String()
-		if ownerRef.Name != "" && hasAPIVersion && ownerRef.Kind == clusterv1beta1.ClusterKind {
-			// the owning cluster needs to be in the same namespace as the controlPlane per k8s docs
-			clusterKey = &client.ObjectKey{
-				Name:      ownerRef.Name,
-				Namespace: controlPlane.Namespace,
-			}
-		}
-	}
-	// if we never found a cluster return a distinct signal so that the caller knows nothing has yet been set
-	if clusterKey == nil {
-		return nil, nil
-	}
-	var capiCluster clusterv1beta1.Cluster
-	err := r.Get(ctx, *clusterKey, &capiCluster)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get backing capi cluster: %w", err)
-	}
-	return &capiCluster, nil
 }
 
 // reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
