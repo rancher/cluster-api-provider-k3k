@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
@@ -44,9 +45,12 @@ import (
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 	infrastructurev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
@@ -57,6 +61,8 @@ const (
 	ownerNameLabel      = "app.cattle.io/owner-name"
 	ownerNamespaceLabel = "app.cattle.io/owner-ns"
 	finalizer           = "app.cattle.io/upstream-remove"
+
+	k3kControlPlaneKind = "K3kControlPlane"
 )
 
 type scope struct {
@@ -74,10 +80,34 @@ type K3kControlPlaneReconciler struct {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controlplanev1.K3kControlPlane{}).
-		Complete(r)
+func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	k3kControlPlane := &controlplanev1.K3kControlPlane{}
+	c, err := ctrl.NewControllerManagedBy(mgr).
+		For(k3kControlPlane).
+		Build(r)
+
+	if err != nil {
+		return fmt.Errorf("failed setting up the K3kControlPlane controller manager: %w", err)
+	}
+
+	if err = c.Watch(
+		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
+		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &infrastructurev1.K3kCluster{})),
+		predicates.ClusterUnpaused(log),
+	); err != nil {
+		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
+	}
+
+	if err = c.Watch(
+		source.Kind(mgr.GetCache(), &infrastructurev1.K3kCluster{}),
+		handler.EnqueueRequestsFromMapFunc(r.k3kClusterToK3kControlPlane(log)),
+	); err != nil {
+		return fmt.Errorf("failed adding a watch for K3kCluster")
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=k3kcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -459,5 +489,42 @@ func controlPlaneOwnerRef(controlPlane *controlplanev1.K3kControlPlane) metav1.O
 		Kind:       controlPlane.Kind,
 		Name:       controlPlane.Name,
 		UID:        controlPlane.UID,
+	}
+}
+
+func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger) handler.MapFunc {
+	return func(ctx context.Context, o client.Object) []ctrl.Request {
+		k3kCluster, ok := o.(*infrastructurev1.K3kCluster)
+		if !ok {
+			log.Error(fmt.Errorf("expected a K3kCluster but got a %T", o), "Expected K3kCluster")
+			return nil
+		}
+
+		if !k3kCluster.ObjectMeta.DeletionTimestamp.IsZero() {
+			return nil
+		}
+
+		cluster, err := capiutil.GetOwnerCluster(ctx, r.Client, k3kCluster.ObjectMeta)
+		if err != nil {
+			log.Error(err, "failed to get owning cluster")
+			return nil
+		}
+		if cluster == nil {
+			return nil
+		}
+
+		controlPlaneRef := cluster.Spec.ControlPlaneRef
+		if controlPlaneRef == nil || controlPlaneRef.Kind != k3kControlPlaneKind {
+			return nil
+		}
+
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      controlPlaneRef.Name,
+					Namespace: controlPlaneRef.Namespace,
+				},
+			},
+		}
 	}
 }
