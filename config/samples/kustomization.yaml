@@ -2,4 +2,5 @@
 resources:
 - controlplane_v1alpha1_k3kcontrolplane.yaml
 - infrastructure_v1alpha1_k3kcluster.yaml
+- capi_cluster.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

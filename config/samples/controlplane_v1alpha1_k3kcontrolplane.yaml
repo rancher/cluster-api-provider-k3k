@@ -9,4 +9,20 @@ metadata:
     app.kubernetes.io/created-by: capi-k3k
   name: k3kcontrolplane-sample
 spec:
-  # TODO(user): Add fields here
+  servers: 1
+  agents: 3
+  token: someexamplereplaceme
+  version: v1.26.0-k3s2
+  clusterCIDR: 10.30.0.0/16
+  serviceCIDR: 10.31.0.0/16
+  clusterDNS: 10.31.0.10
+  serverArgs:
+  - "--write-kubeconfig-mode=777"
+  expose:
+    ingress:
+      enabled: false
+      ingressClassName: "traefik"
+    loadbalancer:
+      enabled: false
+    nodePort:
+      enabled: false 

@@ -18,35 +18,33 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // K3kClusterSpec defines the desired state of K3kCluster
 type K3kClusterSpec struct {
 	// ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
 	// time by the end user, the controller will fill this in when provisioning is complete.
-	ControlPlaneEndpoint ApiEndpoint `json:"controlPlaneEndpoint"`
+	ControlPlaneEndpoint clusterv1beta1.APIEndpoint `json:"controlPlaneEndpoint"`
 }
 
-type ApiEndpoint struct {
-	Host string `json:"host"`
-	Port int32  `json:"port"`
-}
-
-// K3kClusterStatus defines the observed state of K3kCluster
+// K3kClusterStatus defines the observed state of K3kCluster.
 type K3kClusterStatus struct {
-	// Ready is true when the cluster is ready to be used
+	// Ready is true when the cluster is ready to be used.
 	Ready bool `json:"ready"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// K3kCluster is the Schema for the k3kclusters API
+// K3kCluster is the Schema for the K3kclusters API
 type K3kCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   K3kClusterSpec   `json:"spec,omitempty"`
+	// Spec is the desired spec.
+	Spec K3kClusterSpec `json:"spec,omitempty"`
+	// Status is the current status.
 	Status K3kClusterStatus `json:"status,omitempty"`
 }
 
