@@ -19,29 +19,35 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"log"
 	"os"
 
+	"github.com/go-logr/stdr"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	controlplanev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 	controlplanecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/controlplane"
 	infrastructurecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/infrastructure"
+	"github.com/rancher-sandbox/cluster-api-provider-k3k/internal/helm"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -76,13 +82,15 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(stdr.New(log.New(os.Stdout, "", log.LstdFlags)))
+	k3kVersion := os.Getenv("K3K_VERSION")
+	if k3kVersion == "" {
+		setupLog.Error(fmt.Errorf("K3K_VERSION must be set"), "unable to start manager")
+		os.Exit(1)
+	}
+	setupLog.Info("Upstream K3K controller desired chart version", "K3K_VERSION", k3kVersion)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -132,11 +140,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	restClientGetter, err := newRestClientGetter(mgr)
+	if err != nil {
+		setupLog.Error(err, "failed to set up REST client getter")
+		os.Exit(1)
+	}
+
 	ctx := ctrl.SetupSignalHandler()
 
 	if err = (&controlplanecontroller.K3kControlPlaneReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k-operator", "k3k-internal"),
+		K3KVersion: k3kVersion,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "K3kControlPlane")
 		os.Exit(1)
@@ -164,4 +180,22 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func newRestClientGetter(mgr manager.Manager) (*helm.SimpleRESTClientGetter, error) {
+	restConfig := mgr.GetConfig()
+	k8s, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client set: %w", err)
+	}
+	restMapper := mgr.GetRESTMapper()
+	cache := memory.NewMemCacheClient(k8s.Discovery())
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	return &helm.SimpleRESTClientGetter{
+		ClientConfig:    kubeConfig,
+		RESTConfig:      restConfig,
+		CachedDiscovery: cache,
+		RESTMapper:      restMapper,
+	}, nil
 }

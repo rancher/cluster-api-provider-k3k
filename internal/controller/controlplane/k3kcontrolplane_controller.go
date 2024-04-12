@@ -29,26 +29,27 @@ import (
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	"github.com/rancher/k3k/pkg/controller/kubeconfig"
 	"github.com/rancher/k3k/pkg/controller/util"
+	"helm.sh/helm/v3/pkg/storage/driver"
 	v1 "k8s.io/api/core/v1"
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/retry"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 	infrastructurev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"github.com/rancher-sandbox/cluster-api-provider-k3k/internal/helm"
 )
 
 const (
@@ -60,7 +61,9 @@ const (
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
 type K3kControlPlaneReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme     *runtime.Scheme
+	Helm       helm.Client
+	K3KVersion string
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -77,13 +80,22 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters/status,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
 //+kubebuilder:rbac:groups=k3k.io,resources=clusters,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,resourceNames=cluster-admin,verbs=bind
+//+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;create
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;create
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
+//+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=create
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-
+	if err := r.ensureUpstreamChart(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to ensure upstream K3K release is deployed: %w", err)
+	} else {
+		log.Info("The upstream K3K controller Helm release is deployed without errors.")
+	}
 	var k3kControlPlane controlplanev1.K3kControlPlane
 	err := r.Get(ctx, req.NamespacedName, &k3kControlPlane)
 	if err != nil {
@@ -177,6 +189,30 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+// ensureUpstreamChart tries to install a release of the upstream K3K chart or upgrade it if there is a new version.
+func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) error {
+	log := ctrl.LoggerFrom(ctx)
+	if err := r.Helm.ReleasePresent(ctx, r.K3KVersion); err != nil {
+		values := map[string]any{}
+		if errors.Is(err, driver.ErrReleaseNotFound) {
+			if err := r.Helm.DeployLocalChart(ctx, values); err != nil {
+				return fmt.Errorf("failed to deploy a local K3K release: %w", err)
+			}
+			log.Info("Successfully deployed the upstream K3K release.")
+			return nil
+		}
+		if errors.Is(err, helm.ErrReleaseOutdated) {
+			if err := r.Helm.UpgradeLocalChart(ctx, values); err != nil {
+				return fmt.Errorf("failed to upgrade a local K3K release: %w", err)
+			}
+			log.Info("Successfully upgraded the upstream K3K release.")
+			return nil
+		}
+		return fmt.Errorf("couldn't check for the presence of a K3K release: %w", err)
+	}
+	return nil
 }
 
 // getClusterOwner retrieves the CAPI cluster owning this controlPlane. Returns an error if the cluster was specified by could not be retrieved.
