@@ -89,7 +89,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 	// enqueue K3kControlPlane when CAPI cluster changes
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
-		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &infrastructurev1.K3kCluster{})),
+		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.K3kControlPlane{})),
 		predicates.ClusterUnpaused(log),
 	); err != nil {
 		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
