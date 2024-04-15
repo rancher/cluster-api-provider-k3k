@@ -1,40 +1,64 @@
 run:
-  deadline: 5m
   allow-parallel-runners: true
+linters-settings:
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  gocyclo:
+    min-complexity: 10
+  misspell:
+    locale: US
 
-issues:
-  # don't skip warning about doc comments
-  # don't exclude the default set of lint
-  exclude-use-default: false
-  # restore some of the defaults
-  # (fill in the rest as needed)
-  exclude-rules:
-    - path: "api/*"
-      linters:
-        - lll
-    - path: "internal/*"
-      linters:
-        - dupl
-        - lll
 linters:
   disable-all: true
   enable:
+    - bodyclose
     - dupl
     - errcheck
+    - errname
+    - exhaustive
     - exportloopref
     - goconst
+    - gocritic
     - gocyclo
     - gofmt
     - goimports
+    - goprintffuncname
+    - gosec
     - gosimple
     - govet
     - ineffassign
-    - lll
     - misspell
     - nakedret
+    - nilerr
+    - noctx
     - prealloc
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
+    - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
+    - wastedassign
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - golint
+        - staticcheck
+        - scopelint
+        - gochecknoglobals
+        - noctx
+        - unparam
+        - gosec

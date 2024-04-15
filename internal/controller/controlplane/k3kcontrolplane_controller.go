@@ -89,6 +89,8 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=create
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
+//
+//nolint:gocyclo // This method can't be simple.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if err := r.ensureUpstreamChart(ctx); err != nil {
@@ -107,14 +109,14 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	if !k3kControlPlane.DeletionTimestamp.IsZero() {
 		log.Info("About to remove upstream cluster")
-		if err := r.deleteUpstreamClusters(ctx, k3kControlPlane); err != nil {
+		if err := r.deleteUpstreamClusters(ctx, &k3kControlPlane); err != nil {
 			log.Error(err, "Couldn't remove upstream cluster")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 	// we re-enqueue and take no action if we don't have a cluster owner
-	capiClusterOwner, err := r.getClusterOwner(ctx, k3kControlPlane)
+	capiClusterOwner, err := r.getClusterOwner(ctx, &k3kControlPlane)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
 	}
@@ -135,7 +137,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	upstreamCluster, err := r.reconcileUpstreamCluster(ctx, k3kControlPlane)
+	upstreamCluster, err := r.reconcileUpstreamCluster(ctx, &k3kControlPlane)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to reconcile k3k cluster: %w", err)
 	}
@@ -150,10 +152,10 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Factor:   2,
 		Jitter:   0.1,
 	}
-	var kubeconfig *clientcmdapi.Config
+	var config *clientcmdapi.Config
 	var retryErr error
 	if err := retry.OnError(backoff, apiError.IsNotFound, func() error {
-		kubeconfig, retryErr = r.getKubeconfig(ctx, *upstreamCluster)
+		config, retryErr = r.getKubeconfig(ctx, upstreamCluster)
 		if retryErr != nil {
 			return retryErr
 		}
@@ -163,16 +165,16 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("unable to get kubeconfig secret")
 	}
 
-	if err := r.createKubeconfigSecret(ctx, *kubeconfig, k3kControlPlane); err != nil {
+	if err := r.createKubeconfigSecret(ctx, config, &k3kControlPlane); err != nil {
 		log.Error(err, "Unable to store kubeconfig as a secret")
 		return ctrl.Result{}, fmt.Errorf("unable to store kubeconfig secret")
 	}
-	serverUrl, err := serverUrlFromKubeConfig(*kubeconfig)
+	serverURL, err := serverURLFromKubeConfig(config)
 	if err != nil {
-		log.Error(err, "Unable to get serverUrl from kubeconfig")
+		log.Error(err, "Unable to get serverURL from kubeconfig")
 		return ctrl.Result{}, fmt.Errorf("unable to resolve server url")
 	}
-	err = r.updateCluster(ctx, serverUrl, capiClusterOwner)
+	err = r.updateCluster(ctx, serverURL, capiClusterOwner)
 	if err != nil {
 		log.Error(err, "Unable to update capiCluster")
 		return ctrl.Result{}, fmt.Errorf("unable to update capi cluster")
@@ -217,7 +219,7 @@ func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) err
 
 // getClusterOwner retrieves the CAPI cluster owning this controlPlane. Returns an error if the cluster was specified by could not be retrieved.
 // can return nil, nil if no clusterOwner ref has been set yet
-func (r *K3kControlPlaneReconciler) getClusterOwner(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) (*clusterv1beta1.Cluster, error) {
+func (r *K3kControlPlaneReconciler) getClusterOwner(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) (*clusterv1beta1.Cluster, error) {
 	var clusterKey *client.ObjectKey
 	for _, ownerRef := range controlPlane.OwnerReferences {
 		hasAPIVersion := ownerRef.APIVersion == clusterv1beta1.GroupVersion.String()
@@ -243,7 +245,7 @@ func (r *K3kControlPlaneReconciler) getClusterOwner(ctx context.Context, control
 
 // reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
 // It doesn't remove clusters if the controlPlane is being deleted.
-func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) (*upstream.Cluster, error) {
+func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) (*upstream.Cluster, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	clusters, err := r.getUpstreamClusters(ctx, controlPlane)
@@ -267,8 +269,8 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 	}
 	if len(clusters) > 1 {
 		var names []string
-		for _, cluster := range clusters {
-			names = append(names, cluster.Name)
+		for i := range clusters {
+			names = append(names, clusters[i].Name)
 		}
 		joinedNames := strings.Join(names, ", ")
 		log.Error(fmt.Errorf("controlplane %s owns two or more clusters: %s, refusing to process further", controlPlane.Name, joinedNames), "need to delete upstream clusters")
@@ -309,7 +311,7 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 }
 
 // deleteUpstreamClusters deletes all upstream clusters associated with this controlPlane and removes the finalizer on the controlPlane.
-func (r *K3kControlPlaneReconciler) deleteUpstreamClusters(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) error {
+func (r *K3kControlPlaneReconciler) deleteUpstreamClusters(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	clusters, err := r.getUpstreamClusters(ctx, controlPlane)
@@ -317,24 +319,24 @@ func (r *K3kControlPlaneReconciler) deleteUpstreamClusters(ctx context.Context, 
 		return fmt.Errorf("unable to get current clusters for controlPlane %s/%s: %w", controlPlane.Namespace, controlPlane.Name, err)
 	}
 	var deleteErrs []error
-	for _, cluster := range clusters {
-		if err := r.Delete(ctx, &cluster); err != nil && !apiError.IsNotFound(err) {
-			log.Error(err, "failed to delete upstream cluster "+cluster.Name)
+	for i := range clusters {
+		if err := r.Delete(ctx, &clusters[i]); err != nil && !apiError.IsNotFound(err) {
+			log.Error(err, "failed to delete upstream cluster "+clusters[i].Name)
 			deleteErrs = append(deleteErrs, err)
 		}
 	}
 	if err := errors.Join(deleteErrs...); err != nil {
 		return fmt.Errorf("failed to delete some upstream clusters: %w", err)
 	}
-	controllerutil.RemoveFinalizer(&controlPlane, finalizer)
-	err = r.Update(ctx, &controlPlane)
+	controllerutil.RemoveFinalizer(controlPlane, finalizer)
+	err = r.Update(ctx, controlPlane)
 	if err != nil {
 		return fmt.Errorf("unable to update k3k controlplane finalizer after removing clusters: %w", err)
 	}
 	return nil
 }
 
-func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) ([]upstream.Cluster, error) {
+func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) ([]upstream.Cluster, error) {
 	var currentClusters upstream.ClusterList
 	ownerNameRequirement, err := labels.NewRequirement(ownerNameLabel, selection.Equals, []string{controlPlane.Name})
 	if err != nil {
@@ -352,8 +354,8 @@ func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, con
 	return currentClusters.Items, nil
 }
 
-// getKubeconfig retrieves the kubeconfig for the given cluster
-func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamCluster upstream.Cluster) (*clientcmdapi.Config, error) {
+// getKubeconfig retrieves the kubeconfig for the given upstream K3k cluster.
+func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamCluster *upstream.Cluster) (*clientcmdapi.Config, error) {
 	// TODO: We set the expiry to one year here, but we need to continually keep this up to date
 	cfg := kubeconfig.KubeConfig{
 		CN:         util.AdminCommonName,
@@ -364,11 +366,11 @@ func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamC
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current config to derive hostname: %w", err)
 	}
-	url, err := url.Parse(restConfig.Host)
+	u, err := url.Parse(restConfig.Host)
 	if err != nil {
-		return nil, fmt.Errorf("unable to extract url from specificed hostname: %s, %w", restConfig.Host, err)
+		return nil, fmt.Errorf("unable to extract URL from specificed hostname: %s, %w", restConfig.Host, err)
 	}
-	rawKubeConfig, err := cfg.Extract(ctx, r.Client, &upstreamCluster, url.Hostname())
+	rawKubeConfig, err := cfg.Extract(ctx, r.Client, upstreamCluster, u.Hostname())
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve raw kubeconfig data: %w", err)
 	}
@@ -376,13 +378,13 @@ func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamC
 }
 
 // createKubeconfigSecret stores the kubeconfig into a secret which can be retrieved by CAPI later on
-func (r *K3kControlPlaneReconciler) createKubeconfigSecret(ctx context.Context, kubeConfig clientcmdapi.Config, controlPlane controlplanev1.K3kControlPlane) error {
+func (r *K3kControlPlaneReconciler) createKubeconfigSecret(ctx context.Context, kubeConfig *clientcmdapi.Config, controlPlane *controlplanev1.K3kControlPlane) error {
 	ownerRef := controlPlaneOwnerRef(controlPlane)
-	kubeConfigData, err := clientcmd.Write(kubeConfig)
+	kubeConfigData, err := clientcmd.Write(*kubeConfig)
 	if err != nil {
 		return fmt.Errorf("unable to marshall kubeconfig %w", err)
 	}
-	secret := capiKubeconfig.GenerateSecretWithOwner(client.ObjectKeyFromObject(&controlPlane), kubeConfigData, ownerRef)
+	secret := capiKubeconfig.GenerateSecretWithOwner(client.ObjectKeyFromObject(controlPlane), kubeConfigData, ownerRef)
 	err = r.Create(ctx, secret)
 	if apiError.IsAlreadyExists(err) {
 		var currentSecret v1.Secret
@@ -402,7 +404,7 @@ func (r *K3kControlPlaneReconciler) createKubeconfigSecret(ctx context.Context, 
 	return nil
 }
 
-func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverUrl url.URL, capiCluster *clusterv1beta1.Cluster) error {
+func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL *url.URL, capiCluster *clusterv1beta1.Cluster) error {
 	clusterRef := capiCluster.Spec.InfrastructureRef
 	groupVersion := infrastructurev1.GroupVersion
 	if clusterRef == nil || clusterRef.APIVersion != groupVersion.String() && clusterRef.Kind != "K3kCluster" {
@@ -417,11 +419,11 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverUrl
 		return fmt.Errorf("unable to get k3k cluster %s/%s: %w", k3kObjectKey.Namespace, k3kObjectKey.Name, err)
 	}
 	k3kCluster = *k3kCluster.DeepCopy()
-	host := serverUrl.Hostname()
+	host := serverURL.Hostname()
 	k3kCluster.Spec.ControlPlaneEndpoint.Host = host
-	port := serverUrl.Port()
+	port := serverURL.Port()
 	if port != "" {
-		intPort, err := strconv.Atoi(port)
+		intPort, err := strconv.ParseInt(port, 10, 32)
 		if err != nil {
 			return fmt.Errorf("unable to cast port %s from string to int: %w", port, err)
 		}
@@ -438,26 +440,26 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverUrl
 	return nil
 }
 
-func serverUrlFromKubeConfig(kubeconfig clientcmdapi.Config) (url.URL, error) {
-	ctx, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
+func serverURLFromKubeConfig(config *clientcmdapi.Config) (*url.URL, error) {
+	ctx, ok := config.Contexts[config.CurrentContext]
 	if !ok {
-		return url.URL{}, fmt.Errorf("current context %s was not a valid context", kubeconfig.CurrentContext)
+		return nil, fmt.Errorf("current context %s was not a valid context", config.CurrentContext)
 	}
-	cluster, ok := kubeconfig.Clusters[ctx.Cluster]
+	cluster, ok := config.Clusters[ctx.Cluster]
 	if !ok {
-		return url.URL{}, fmt.Errorf("cluster %s defined in context %s was not a valid cluster", ctx.Cluster, kubeconfig.CurrentContext)
+		return nil, fmt.Errorf("cluster %s defined in context %s was not a valid cluster", ctx.Cluster, config.CurrentContext)
 	}
-	serverUrl, err := url.Parse(cluster.Server)
+	serverURL, err := url.Parse(cluster.Server)
 	if err != nil {
-		return url.URL{}, fmt.Errorf("unable to parse server url %s into a url", serverUrl)
+		return nil, fmt.Errorf("unable to parse server url %s into a url", serverURL)
 	}
-	if serverUrl == nil {
-		return url.URL{}, fmt.Errorf("serverUrl was parsed, but was nil")
+	if serverURL == nil {
+		return nil, fmt.Errorf("serverURL was parsed, but was nil")
 	}
-	return *serverUrl, nil
+	return serverURL, nil
 }
 
-func controlPlaneOwnerRef(controlPlane controlplanev1.K3kControlPlane) metav1.OwnerReference {
+func controlPlaneOwnerRef(controlPlane *controlplanev1.K3kControlPlane) metav1.OwnerReference {
 	return metav1.OwnerReference{
 		APIVersion: controlPlane.APIVersion,
 		Kind:       controlPlane.Kind,
