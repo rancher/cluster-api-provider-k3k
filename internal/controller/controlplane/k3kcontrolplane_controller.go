@@ -96,7 +96,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 	// enqueue K3kControlPlane when CAPI cluster changes
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
-		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &infrastructurev1.K3kCluster{})),
+		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.K3kControlPlane{})),
 		predicates.ClusterUnpaused(log),
 	); err != nil {
 		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
@@ -154,7 +154,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	if cluster == nil {
 		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
-		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
+		log.V(4).Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
 		return ctrl.Result{}, nil
 	}
 
@@ -510,25 +510,33 @@ func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger)
 	return func(ctx context.Context, o client.Object) []ctrl.Request {
 		k3kCluster, ok := o.(*infrastructurev1.K3kCluster)
 		if !ok {
-			log.Error(fmt.Errorf("expected a K3kCluster but got a %T", o), "Expected K3kCluster")
+			log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", o), "Failed to enqueue controlplane for K3kCluster")
 			return nil
 		}
 
 		if !k3kCluster.ObjectMeta.DeletionTimestamp.IsZero() {
+			log.V(4).Info("Refusing to enqueue controlplane for deleting K3kCluster", "k3kcluster", k3kCluster.Name)
 			return nil
 		}
 
 		cluster, err := capiutil.GetOwnerCluster(ctx, r.Client, k3kCluster.ObjectMeta)
 		if err != nil {
-			log.Error(err, "failed to get owning cluster")
+			log.Error(fmt.Errorf("failed to get owning cluster: %w", err), "Failed to enqueue controlplane for K3kCluster", "k3kcluster", k3kCluster.Name)
 			return nil
 		}
 		if cluster == nil {
+			// Infrastructure cluster objects are not created with owner references, CAPI will adopt them at a later time
+			log.V(4).Error(fmt.Errorf("cluster is nil"), "Failed to enqueue controlplane for K3kCluster", "k3kcluster", k3kCluster.Name)
 			return nil
 		}
 
 		controlPlaneRef := cluster.Spec.ControlPlaneRef
-		if controlPlaneRef == nil || controlPlaneRef.Kind != k3kControlPlaneKind {
+		if controlPlaneRef == nil {
+			log.Error(fmt.Errorf("control plane ref is nil"), "Failed to enqueue controlplane for K3kCluster", "cluster", cluster.Name)
+			return nil
+		}
+		if controlPlaneRef.Kind != k3kControlPlaneKind {
+			log.Error(fmt.Errorf("expected controlplane ref of kind %s but found %T", k3kControlPlaneKind, controlPlaneRef.Kind), "Failed to enqueue controlplane for K3kCluster", "cluster", cluster.Name)
 			return nil
 		}
 
