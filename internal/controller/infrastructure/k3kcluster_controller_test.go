@@ -70,7 +70,6 @@ var _ = Describe("K3kCluster Controller", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &K3kClusterReconciler{
 				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

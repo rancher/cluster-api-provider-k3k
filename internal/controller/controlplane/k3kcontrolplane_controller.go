@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	"github.com/rancher/k3k/pkg/controller/kubeconfig"
 	"github.com/rancher/k3k/pkg/controller/util"
@@ -34,18 +35,23 @@ import (
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/retry"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiutil "sigs.k8s.io/cluster-api/util"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
 	infrastructurev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
@@ -56,21 +62,48 @@ const (
 	ownerNameLabel      = "app.cattle.io/owner-name"
 	ownerNamespaceLabel = "app.cattle.io/owner-ns"
 	finalizer           = "app.cattle.io/upstream-remove"
+
+	k3kControlPlaneKind = "K3kControlPlane"
 )
 
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
 type K3kControlPlaneReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
 	Helm       helm.Client
 	K3KVersion string
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&controlplanev1.K3kControlPlane{}).
-		Complete(r)
+func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	k3kControlPlane := &controlplanev1.K3kControlPlane{}
+	c, err := ctrl.NewControllerManagedBy(mgr).
+		For(k3kControlPlane).
+		Build(r)
+
+	if err != nil {
+		return fmt.Errorf("failed setting up the K3kControlPlane controller manager: %w", err)
+	}
+
+	// enqueue K3kControlPlane when CAPI cluster changes
+	if err = c.Watch(
+		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
+		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.K3kControlPlane{})),
+		predicates.ClusterUnpaused(log),
+	); err != nil {
+		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
+	}
+
+	// enqueue K3kControlPlane when K3kCluster changes
+	if err = c.Watch(
+		source.Kind(mgr.GetCache(), &infrastructurev1.K3kCluster{}),
+		handler.EnqueueRequestsFromMapFunc(r.k3kClusterToK3kControlPlane(log)),
+	); err != nil {
+		return fmt.Errorf("failed adding a watch for K3kCluster")
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=k3kcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -107,6 +140,22 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, fmt.Errorf("unable to get controlplane for request %w", err)
 	}
+
+	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
+	}
+	if cluster == nil {
+		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
+		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
+		return ctrl.Result{}, nil
+	}
+
+	if capiannotations.IsPaused(cluster, &k3kControlPlane) {
+		log.Info("Reconciliation is paused for this object")
+		return ctrl.Result{}, nil
+	}
+
 	if !k3kControlPlane.DeletionTimestamp.IsZero() {
 		log.Info("About to remove upstream cluster")
 		if err := r.deleteUpstreamClusters(ctx, &k3kControlPlane); err != nil {
@@ -115,19 +164,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{}, nil
 	}
-	// we re-enqueue and take no action if we don't have a cluster owner
-	capiClusterOwner, err := r.getClusterOwner(ctx, &k3kControlPlane)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
-	}
-	if capiClusterOwner == nil {
-		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
-		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		return ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: time.Millisecond * 100,
-		}, nil
-	}
+
 	if !controllerutil.ContainsFinalizer(&k3kControlPlane, finalizer) {
 		controllerutil.AddFinalizer(&k3kControlPlane, finalizer)
 		err := r.Update(ctx, &k3kControlPlane)
@@ -174,7 +211,8 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Error(err, "Unable to get serverURL from kubeconfig")
 		return ctrl.Result{}, fmt.Errorf("unable to resolve server url")
 	}
-	err = r.updateCluster(ctx, serverURL, capiClusterOwner)
+
+	err = r.updateCluster(ctx, serverURL, cluster)
 	if err != nil {
 		log.Error(err, "Unable to update capiCluster")
 		return ctrl.Result{}, fmt.Errorf("unable to update capi cluster")
@@ -215,32 +253,6 @@ func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) err
 		return fmt.Errorf("couldn't check for the presence of a K3K release: %w", err)
 	}
 	return nil
-}
-
-// getClusterOwner retrieves the CAPI cluster owning this controlPlane. Returns an error if the cluster was specified by could not be retrieved.
-// can return nil, nil if no clusterOwner ref has been set yet
-func (r *K3kControlPlaneReconciler) getClusterOwner(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) (*clusterv1beta1.Cluster, error) {
-	var clusterKey *client.ObjectKey
-	for _, ownerRef := range controlPlane.OwnerReferences {
-		hasAPIVersion := ownerRef.APIVersion == clusterv1beta1.GroupVersion.String()
-		if ownerRef.Name != "" && hasAPIVersion && ownerRef.Kind == clusterv1beta1.ClusterKind {
-			// the owning cluster needs to be in the same namespace as the controlPlane per k8s docs
-			clusterKey = &client.ObjectKey{
-				Name:      ownerRef.Name,
-				Namespace: controlPlane.Namespace,
-			}
-		}
-	}
-	// if we never found a cluster return a distinct signal so that the caller knows nothing has yet been set
-	if clusterKey == nil {
-		return nil, nil
-	}
-	var capiCluster clusterv1beta1.Cluster
-	err := r.Get(ctx, *clusterKey, &capiCluster)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get backing capi cluster: %w", err)
-	}
-	return &capiCluster, nil
 }
 
 // reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
@@ -465,5 +477,47 @@ func controlPlaneOwnerRef(controlPlane *controlplanev1.K3kControlPlane) metav1.O
 		Kind:       controlPlane.Kind,
 		Name:       controlPlane.Name,
 		UID:        controlPlane.UID,
+	}
+}
+
+// k3kClusterToK3kControlPlane returns a handler.MapFunc for use in watch events, for re-enqueuing a
+// controlplanev1.K3kControlPlane object when it's related K3kCluster changes. This function returns a function which
+// will, if the input is a valid infrastructurev1.K3kCluster object, make sure it is not deleting, extract the
+// controlplane from the related CAPI Cluster's controlPlaneRef, and then return the namespace and name of the
+// controlplanev1.K3kControlplane within the ctrl.Request.
+func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger) handler.MapFunc {
+	return func(ctx context.Context, o client.Object) []ctrl.Request {
+		k3kCluster, ok := o.(*infrastructurev1.K3kCluster)
+		if !ok {
+			log.Error(fmt.Errorf("expected a K3kCluster but got a %T", o), "Expected K3kCluster")
+			return nil
+		}
+
+		if !k3kCluster.ObjectMeta.DeletionTimestamp.IsZero() {
+			return nil
+		}
+
+		cluster, err := capiutil.GetOwnerCluster(ctx, r.Client, k3kCluster.ObjectMeta)
+		if err != nil {
+			log.Error(err, "failed to get owning cluster")
+			return nil
+		}
+		if cluster == nil {
+			return nil
+		}
+
+		controlPlaneRef := cluster.Spec.ControlPlaneRef
+		if controlPlaneRef == nil || controlPlaneRef.Kind != k3kControlPlaneKind {
+			return nil
+		}
+
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      controlPlaneRef.Name,
+					Namespace: controlPlaneRef.Namespace,
+				},
+			},
+		}
 	}
 }
