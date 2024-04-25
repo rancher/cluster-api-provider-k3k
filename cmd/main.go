@@ -148,7 +148,6 @@ func main() {
 
 	if err = (&controlplanecontroller.K3kControlPlaneReconciler{
 		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
 		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k-operator", "k3k-internal"),
 		K3KVersion: k3kVersion,
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -157,7 +156,6 @@ func main() {
 	}
 	if err = (&infrastructurecontroller.K3kClusterReconciler{
 		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "K3kCluster")
 		os.Exit(1)
