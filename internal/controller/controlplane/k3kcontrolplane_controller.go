@@ -139,14 +139,6 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *scope) (ctrl.Result, error) {
-	if scope.cluster == nil {
-		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
-		scope.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", scope.k3kControlPlane.Name)
-		return ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: time.Millisecond * 100,
-		}, nil
-	}
 	if !controllerutil.ContainsFinalizer(scope.k3kControlPlane, finalizer) {
 		controllerutil.AddFinalizer(scope.k3kControlPlane, finalizer)
 		err := r.Update(ctx, scope.k3kControlPlane)
