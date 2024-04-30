@@ -19,7 +19,6 @@ package infrastructure
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -30,7 +29,6 @@ import (
 // K3kClusterReconciler reconciles a K3kCluster object
 type K3kClusterReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters,verbs=get;list;watch;create;update;patch;delete
