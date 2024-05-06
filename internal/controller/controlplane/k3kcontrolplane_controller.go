@@ -158,9 +158,8 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 	scope.Info("Reconciled upstream cluster for controlPlane", "upstreamCluster", upstreamCluster, "controlPlane", scope.k3kControlPlane.Name)
 
 	backoff := wait.Backoff{
-		Steps:    5,
-		Duration: 20 * time.Second,
-		Factor:   2,
+		Steps:    20,
+		Duration: 5 * time.Second,
 		Jitter:   0.1,
 	}
 	var config *clientcmdapi.Config
