@@ -1,15 +1,19 @@
-# Build the manager binary
-FROM golang:1.21 AS builder
+FROM golang:1.22 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG K3K_VERSION
 
 WORKDIR /workspace
-# Copy the Go Modules manifests
+
+# Download and unzip the upstream K3K chart.
+RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
+    gunzip k3k-${K3K_VERSION}.tgz && \
+    tar xvf k3k-${K3K_VERSION}.tar && \
+    mkdir -p charts && \
+    mv k3k charts/k3k
+
 COPY go.mod go.mod
 COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
 # Copy the go source
@@ -23,13 +27,6 @@ COPY internal internal
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
-
-# Download and unzip the upstream K3K chart.
-RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
-    gunzip k3k-${K3K_VERSION}.tgz && \
-    tar xvf k3k-${K3K_VERSION}.tar && \
-    mkdir -p charts && \
-    mv k3k charts/k3k
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
