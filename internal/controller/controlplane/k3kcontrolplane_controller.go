@@ -35,6 +35,7 @@ import (
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,7 +51,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
@@ -106,6 +109,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &infrastructurev1.K3kCluster{}),
 		handler.EnqueueRequestsFromMapFunc(r.k3kClusterToK3kControlPlane(log)),
+		predicates.All(log, k3kClusterNotDeleting(log), k3kClusterAdoptedByCAPI(log)),
 	); err != nil {
 		return fmt.Errorf("failed adding a watch for K3kCluster")
 	}
@@ -501,6 +505,64 @@ func controlPlaneOwnerRef(controlPlane *controlplanev1.K3kControlPlane) metav1.O
 	}
 }
 
+func k3kClusterNotDeleting(logger logr.Logger) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			log := logger.WithValues("predicate", "k3kClusterNotDeleting")
+
+			k3kCluster, ok := e.ObjectNew.(*infrastructurev1.K3kCluster)
+			if !ok {
+				log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
+				return false
+			}
+
+			if !k3kCluster.ObjectMeta.DeletionTimestamp.IsZero() {
+				log.V(6).Info("Refusing to enqueue controlplane for deleting K3kCluster", "k3kcluster", k3kCluster.Name)
+				return false
+			}
+
+			return true
+		},
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+}
+
+func k3kClusterAdoptedByCAPI(logger logr.Logger) predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			log := logger.WithValues("predicate", "k3kClusterAdoptedByCAPI")
+
+			k3kCluster, ok := e.ObjectNew.(*infrastructurev1.K3kCluster)
+			if !ok {
+				log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
+				return false
+			}
+
+			for _, o := range k3kCluster.OwnerReferences {
+				if o.Kind != clusterv1beta1.ClusterKind {
+					continue
+				}
+				gv, err := schema.ParseGroupVersion(o.APIVersion)
+				if err != nil {
+					log.Error(err, "unable to parse owner reference for K3kCluster")
+					return false
+				}
+				if gv.Group != clusterv1beta1.GroupVersion.Group {
+					continue
+				}
+				return true
+			}
+
+			return false
+		},
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+}
+
 // k3kClusterToK3kControlPlane returns a handler.MapFunc for use in watch events, for re-enqueuing a
 // controlplanev1.K3kControlPlane object when it's related K3kCluster changes. This function returns a function which
 // will, if the input is a valid infrastructurev1.K3kCluster object, make sure it is not deleting, extract the
@@ -514,11 +576,6 @@ func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger)
 			return nil
 		}
 
-		if !k3kCluster.ObjectMeta.DeletionTimestamp.IsZero() {
-			log.V(4).Info("Refusing to enqueue controlplane for deleting K3kCluster", "k3kcluster", k3kCluster.Name)
-			return nil
-		}
-
 		cluster, err := capiutil.GetOwnerCluster(ctx, r.Client, k3kCluster.ObjectMeta)
 		if err != nil {
 			log.Error(fmt.Errorf("failed to get owning cluster: %w", err), "Failed to enqueue controlplane for K3kCluster", "k3kcluster", k3kCluster.Name)
@@ -526,7 +583,13 @@ func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger)
 		}
 		if cluster == nil {
 			// Infrastructure cluster objects are not created with owner references, CAPI will adopt them at a later time
-			log.V(4).Error(fmt.Errorf("cluster is nil"), "Failed to enqueue controlplane for K3kCluster", "k3kcluster", k3kCluster.Name)
+			log.Error(fmt.Errorf("cluster is nil"), "Failed to enqueue controlplane for K3kCluster", "k3kcluster", k3kCluster.Name)
+			return nil
+		}
+		if capiannotations.IsPaused(cluster, k3kCluster) {
+			// If the k3kCluster is paused, updates to the k3kCluster will not have been reconciled yet so enqueuing is
+			// pointless. If the cluster is paused, reconciling the k3kControlplane is pointless.
+			log.V(6).Info("Refusing to enqueue controlplane for paused Cluster", "k3kcluster", k3kCluster.Name)
 			return nil
 		}
 
