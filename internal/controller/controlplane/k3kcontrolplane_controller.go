@@ -99,10 +99,10 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 	// enqueue K3kControlPlane when CAPI cluster changes
 	if err = c.Watch(
 		source.Kind(mgr.GetCache(), &clusterv1beta1.Cluster{}),
-		handler.EnqueueRequestsFromMapFunc(capiutil.ClusterToInfrastructureMapFunc(ctx, k3kControlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.K3kControlPlane{})),
+		handler.EnqueueRequestsFromMapFunc(r.ClusterToK3kControlPlane(log)),
 		predicates.ClusterUnpaused(log),
 	); err != nil {
-		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
+		return fmt.Errorf("failed adding a watch for CAPI Cluster: %v", err)
 	}
 
 	// enqueue K3kControlPlane when K3kCluster changes
@@ -111,7 +111,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ct
 		handler.EnqueueRequestsFromMapFunc(r.k3kClusterToK3kControlPlane(log)),
 		predicates.All(log, k3kClusterNotDeleting(log), k3kClusterAdoptedByCAPI(log)),
 	); err != nil {
-		return fmt.Errorf("failed adding a watch for K3kCluster")
+		return fmt.Errorf("failed adding a watch for K3kCluster: %v", err)
 	}
 
 	return nil
@@ -572,7 +572,7 @@ func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger)
 	return func(ctx context.Context, o client.Object) []ctrl.Request {
 		k3kCluster, ok := o.(*infrastructurev1.K3kCluster)
 		if !ok {
-			log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", o), "Failed to enqueue controlplane for K3kCluster")
+			log.Error(fmt.Errorf("expected object of kind K3kCluster but found %T", o), "Failed to enqueue controlplane for K3kCluster")
 			return nil
 		}
 
@@ -596,6 +596,46 @@ func (r *K3kControlPlaneReconciler) k3kClusterToK3kControlPlane(log logr.Logger)
 		controlPlaneRef := cluster.Spec.ControlPlaneRef
 		if controlPlaneRef == nil {
 			log.Error(fmt.Errorf("control plane ref is nil"), "Failed to enqueue controlplane for K3kCluster", "cluster", cluster.Name)
+			return nil
+		}
+		if controlPlaneRef.Kind != k3kControlPlaneKind {
+			log.Error(fmt.Errorf("expected controlplane ref of kind %s but found %T", k3kControlPlaneKind, controlPlaneRef.Kind), "Failed to enqueue controlplane for K3kCluster", "cluster", cluster.Name)
+			return nil
+		}
+
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      controlPlaneRef.Name,
+					Namespace: controlPlaneRef.Namespace,
+				},
+			},
+		}
+	}
+}
+
+// ClusterToK3kControlPlane returns a handler.MapFunc for use in watch events, for re-enqueuing a
+// controlplanev1.K3kControlPlane object when it's related Cluster changes. This function returns a function which
+// will, if the input is a valid clusterv1beta1.Cluster object, make sure it is not paused, and extract the
+// controlplane from the CAPI Cluster's controlPlaneRef, and then return the namespace and name of the
+// controlplanev1.K3kControlplane within the ctrl.Request.
+func (r *K3kControlPlaneReconciler) ClusterToK3kControlPlane(log logr.Logger) handler.MapFunc {
+	return func(ctx context.Context, o client.Object) []ctrl.Request {
+		cluster, ok := o.(*clusterv1beta1.Cluster)
+		if !ok {
+			log.Error(fmt.Errorf("expected object of kind Cluster but found %T", o), "Failed to enqueue controlplane for Cluster")
+			return nil
+		}
+
+		if cluster.Spec.Paused {
+			// If the cluster is paused, reconciling the k3kControlplane is pointless.
+			log.V(6).Info("Refusing to enqueue controlplane for paused Cluster", "cluster", cluster.Name)
+			return nil
+		}
+
+		controlPlaneRef := cluster.Spec.ControlPlaneRef
+		if controlPlaneRef == nil {
+			log.Error(fmt.Errorf("control plane ref is nil"), "Failed to enqueue controlplane for Cluster", "cluster", cluster.Name)
 			return nil
 		}
 		if controlPlaneRef.Kind != k3kControlPlaneKind {

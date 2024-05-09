@@ -190,7 +190,7 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 						{
 							APIVersion: "cluster.x-k8s.io/v1beta1",
 							Kind:       "Cluster",
-							Name:       "test",
+							Name:       "testcluster",
 							Controller: ptr.To(true),
 						},
 					},
@@ -207,7 +207,7 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testcluster",
 				},
 				Spec: clusterv1beta1.ClusterSpec{
 					Paused: true,
@@ -216,12 +216,12 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 			object: &infrastructurev1.K3kCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testk3kcluster",
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: "cluster.x-k8s.io/v1beta1",
 							Kind:       "Cluster",
-							Name:       "test",
+							Name:       "testcluster",
 							Controller: ptr.To(true),
 						},
 					},
@@ -238,18 +238,18 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testcluster",
 				},
 			},
 			object: &infrastructurev1.K3kCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testk3kcluster",
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: "cluster.x-k8s.io/v1beta1",
 							Kind:       "Cluster",
-							Name:       "test",
+							Name:       "testcluster",
 							Controller: ptr.To(true),
 						},
 					},
@@ -266,7 +266,7 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testcluster",
 				},
 				Spec: clusterv1beta1.ClusterSpec{
 					ControlPlaneRef: &v1.ObjectReference{
@@ -277,12 +277,12 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 			object: &infrastructurev1.K3kCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testk3kcluster",
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: "cluster.x-k8s.io/v1beta1",
 							Kind:       "Cluster",
-							Name:       "test",
+							Name:       "testcluster",
 							Controller: ptr.To(true),
 						},
 					},
@@ -295,32 +295,32 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 				{
 					types.NamespacedName{
 						Namespace: "default",
-						Name:      "test",
+						Name:      "testk3kcontrolplane",
 					},
 				},
 			},
 			cluster: &clusterv1beta1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testcluster",
 				},
 				Spec: clusterv1beta1.ClusterSpec{
 					ControlPlaneRef: &v1.ObjectReference{
 						Kind:      "K3kControlPlane",
 						Namespace: "default",
-						Name:      "test",
+						Name:      "testk3kcontrolplane",
 					},
 				},
 			},
 			object: &infrastructurev1.K3kCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					Name:      "test",
+					Name:      "testk3kcluster",
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: "cluster.x-k8s.io/v1beta1",
 							Kind:       "Cluster",
-							Name:       "test",
+							Name:       "testcluster",
 							Controller: ptr.To(true),
 						},
 					},
@@ -345,6 +345,115 @@ func TestK3kClusterToK3kControlPlane(t *testing.T) {
 			}
 
 			result := r.k3kClusterToK3kControlPlane(logr.Discard())(context.Background(), tt.object)
+			g.Expect(result).To(Equal(tt.expected))
+		})
+	}
+}
+
+func TestClusterToK3kControlPlane(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		expected []ctrl.Request
+		object   client.Object
+	}{
+		{
+			name:     "not a capi cluster",
+			expected: nil,
+			object:   nil,
+		},
+		{
+			name:     "capi cluster is paused",
+			expected: nil,
+			object: &clusterv1beta1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "cluster.x-k8s.io/v1beta1",
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testcluster",
+				},
+				Spec: clusterv1beta1.ClusterSpec{
+					Paused: true,
+				},
+			},
+		},
+		{
+			name:     "cluster has no controlplane ref",
+			expected: nil,
+			object: &clusterv1beta1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "cluster.x-k8s.io/v1beta1",
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testcluster",
+				},
+			},
+		},
+		{
+			name:     "cluster has controlplane ref of different kind",
+			expected: nil,
+			object: &clusterv1beta1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "cluster.x-k8s.io/v1beta1",
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testcluster",
+				},
+				Spec: clusterv1beta1.ClusterSpec{
+					ControlPlaneRef: &v1.ObjectReference{
+						Kind: "NotaK3KControlPlane",
+					},
+				},
+			},
+		},
+		{
+			name: "valid cluster",
+			expected: []reconcile.Request{
+				{
+					types.NamespacedName{
+						Namespace: "default",
+						Name:      "testk3kcontrolplane",
+					},
+				},
+			},
+			object: &clusterv1beta1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "testcluster",
+				},
+				Spec: clusterv1beta1.ClusterSpec{
+					ControlPlaneRef: &v1.ObjectReference{
+						Kind:      "K3kControlPlane",
+						Namespace: "default",
+						Name:      "testk3kcontrolplane",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+			r := &K3kControlPlaneReconciler{
+				Client: sentinelEmptyClient,
+			}
+			if tt.object != nil {
+				scheme := runtime.NewScheme()
+				_ = clusterv1beta1.AddToScheme(scheme)
+				r.Client = fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(tt.object.(*clusterv1beta1.Cluster).DeepCopy()).
+					Build()
+			}
+
+			result := r.ClusterToK3kControlPlane(logr.Discard())(context.Background(), tt.object)
 			g.Expect(result).To(Equal(tt.expected))
 		})
 	}
