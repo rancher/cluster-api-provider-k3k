@@ -96,8 +96,6 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=create
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
-//
-//nolint:gocyclo // This method can't be simple.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if err := r.ensureUpstreamChart(ctx); err != nil {
