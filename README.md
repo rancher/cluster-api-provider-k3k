@@ -1,82 +1,96 @@
 # capi-k3k
 
-A cluster-api provider for [k3k](https://github.com/rancher/k3k).
+A Cluster API provider for [K3k](https://github.com/rancher/k3k).
 
 ## Description
 
-This project aims to allow the provisioning/management of a k3k cluster using CAPI.
+This project allows the provisioning and management of K3k clusters using [CAPI](https://cluster-api.sigs.k8s.io).
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.21.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
-- tilt version v0.33.11+. 
-- helm version v3.12.0+.
 
-### Install/Run Development branch
+The following specify the minimum version requirement of each component:
 
-Follow the [upstream docs](https://cluster-api.sigs.k8s.io/developer/tilt) to setup the project to run locally. The basic steps are repeated here for clarity.
+- Go v1.22
+- Docker v24
+- Access to a Kubernetes cluster v1.25
+- Tilt v0.33.11
+- Helm v3.12.0
 
-Install tilt. Deploy/configure a cluster. The upstream docs use KIND. If using k3d, do the following:
+### Run from development branch
 
-1. Create a local registry (necessary to avoid pushing to a remote repo frequently).
+Follow the [upstream docs](https://cluster-api.sigs.k8s.io/developer/tilt) to run the project locally. The basic steps:
+
+#### Install [Tilt](https://tilt.dev)
+
+#### Deploy a Kubernetes cluster
+
+Any cluster should work. For quick local tests, Kind and K3d are recommended.
+
+#### Create a local Docker container registry
+
+This is necessary to avoid pushing to a remote repo frequently.
+
+For K3d:
+
 ```bash
-k3d registry create
+k3d registry create --port 51111 # Or use a different port.
 ```
 
-2. Retrieve the image name and port using docker.
+#### Create a cluster using the registry
+
 ```bash
-## Look for a "k3d-registry" container
-docker ps 
+k3d cluster create --registry-use $CONTAINER_NAME:$PORT
 ```
 
-3. Create a cluster using the registry. It's also recommended to use the `--image` parameter to deploy a recent k3s version.
-```bash
-k3d cluster create --registry-use $CONTAINER_NAME:$PORT --image rancher/k3s:v1.28.7-k3s1
-```
+#### Configure the project to use the local registry
 
-4. Configure the project to use the local registry.
+Ensure you have GNU sed in your PATH.
+
 ```bash
 make configure-local TEST_IMAGE=$CONTAINER_NAME:PORT/controller:latest
 ```
 
-5. Clone the upstream [capi](https://github.com/kubernetes-sigs/cluster-api) project. In your local copy of the project, paste the following into `tilt-settings.yaml`:
+#### Clone the upstream [CAPI](https://github.com/kubernetes-sigs/cluster-api) project
+
+In your local copy of the project, paste the following into `tilt-settings.yaml`:
+
 ```yaml
 provider_repos:
-- ../cluster-api-provider-k3k
+  - ../cluster-api-provider-k3k
 enable_providers:
-- k3k
+  - k3k
 allowed_contexts:
-- k3d-k3s-default 
+  - k3d-k3s-default 
 ```
+
 Some notes:
-- The above assumes that the upstream capi project is in the same folder as the cluster-api-provider-k3k project. If that isn't true, adjust the path in `provider_repos`.
-- `allowed_contexts` controlls which contexts tilt is able to use to deploy resources. This needs to point to a context for an admin account on the cluster created in step 3. You may need to change this value depending on your current kubeconfig structure.
 
-6. Install the upstream [k3k project](https://github.com/rancher/k3k?tab=readme-ov-file#usage) into the cluster created in step 3:
+- The above assumes that the upstream CAPI project is in the same folder as the cluster-api-provider-k3k project. If
+  that isn't true, adjust the path in `provider_repos`.
+- `allowed_contexts` controls which kubeconfig contexts Tilt is able to use to deploy resources.
+  This needs to point to a context for an admin account on the cluster. You may need to change this value depending on
+  your current kubeconfig contents.
 
-```
-helm repo add k3k https://rancher.github.io/k3k && helm repo update
-helm install my-k3k k3k/k3k --devel
-```
+#### In the local copy of the CAPI upstream project, run Tilt
 
-7. In the local copy of the **upstream project** (meaning the project cloned in step 5), run tilt:
-```
+```bash
 tilt up
 ```
 
-Some notes on running the project:
-- Most changes will cause tilt to automatically re-build/push the image. However, if you are changing a value included as part of the chart (such as RBAC, or CRD structure), this may require you to do the following:
-  - Stop tilt.
-  - In the project repo (for cluster-api-provider-k3k) regenerate the CRDs and charts (`make generate && make manifests`).
-  - Start tilt.
+Most code changes will cause Tilt to automatically rebuild the Go binary, rebuild the Docker image
+and push it to the local registry.
+However, if you are changing values related to RBAC configuration or CRD fields, you may need to do the following:
+
+- Stop Tilt
+- In this project's repo, regenerate the CRDs and manifests (`make generate && make manifests`)
+- Start Tilt again
 
 ## Project Distribution
 
-TODO: This project is in an unreleased, alpha state. As of now, there are no releases, or a supported way to install the project other than the dev setup documented above.
+TODO: This project is in an unreleased, alpha state. As of now, there are no releases, or a supported way to install the
+project other than the dev setup documented above.
 
 ## Contributing
 
@@ -97,4 +111,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
