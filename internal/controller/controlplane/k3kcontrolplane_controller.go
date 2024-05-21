@@ -513,7 +513,7 @@ func k3kClusterNotDeleting(logger logr.Logger) predicate.Funcs {
 
 			k3kCluster, ok := e.ObjectNew.(*infrastructurev1.K3kCluster)
 			if !ok {
-				log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
+				log.Error(fmt.Errorf("expected object of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
 				return false
 			}
 
@@ -537,7 +537,7 @@ func k3kClusterAdoptedByCAPI(logger logr.Logger) predicate.Funcs {
 
 			k3kCluster, ok := e.ObjectNew.(*infrastructurev1.K3kCluster)
 			if !ok {
-				log.Error(fmt.Errorf("expected infrastructure ref of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
+				log.Error(fmt.Errorf("expected object of kind K3kCluster but found %T", e.ObjectNew), "Failed to enqueue controlplane for K3kCluster")
 				return false
 			}
 
