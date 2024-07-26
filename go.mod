@@ -7,7 +7,7 @@ toolchain go1.22.5
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/stdr v1.2.2
-	github.com/rancher/k3k v0.2.1-0.20240215215959-cc914cf8705e
+	github.com/rancher/k3k v0.2.1
 	helm.sh/helm/v3 v3.15.3
 	k8s.io/api v0.30.3
 	k8s.io/apimachinery v0.30.3

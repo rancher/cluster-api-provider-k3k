@@ -343,8 +343,8 @@ github.com/prometheus/procfs v0.12.0 h1:jluTpSng7V9hY0O2R9DzzJHYb2xULk9VTR1V1R/k
 github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3cnaOZAZEfOo=
 github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S+WV0JA6A=
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
-github.com/rancher/k3k v0.2.1-0.20240215215959-cc914cf8705e h1:gUZ1rY47GtQMhsTS3l2APkrziJaTMtxu3B+WSj4na5I=
-github.com/rancher/k3k v0.2.1-0.20240215215959-cc914cf8705e/go.mod h1:j2DYT8TvuAE6htlU8MGfNwrYKl0dfTohl+PNEER94eI=
+github.com/rancher/k3k v0.2.1 h1:hbRMIB+p0eKPh04hf3Ei9/BShiPDRSDlqp/aKxa+71U=
+github.com/rancher/k3k v0.2.1/go.mod h1:j2DYT8TvuAE6htlU8MGfNwrYKl0dfTohl+PNEER94eI=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.2 h1:YwD0ulJSJytLpiaWua0sBDusfsCZohxjxzVTYjwxfV8=
 github.com/rivo/uniseg v0.4.2/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
