@@ -56,13 +56,13 @@ func TestProvisionExampleCluster(t *testing.T) {
 	if out, err := runCommand("kubectl", "wait", "--timeout", "5m",
 		"--for", "jsonpath={.status.controlPlaneReady}",
 		"--for", "jsonpath={.status.infrastructureReady}", "cluster/capicluster-sample"); err != nil {
-		t.Fatalf("failed to wait for infrastructure status: %s", out)
+		t.Fatalf("failed to wait for infrastructure and controlplane statuses: %s", out)
 	}
 
 	t.Log("Trying to get the secret containing the kubeconfig...")
 	if out, err := runCommand("bash", "-c",
 		"kubectl get secret k3kcontrolplane-sample-kubeconfig -o jsonpath={.data.value} | base64 -d > config.yaml"); err != nil {
-		t.Fatalf("failed to wait for infrastructure status: %s", out)
+		t.Fatalf("failed to find kubeconfig secret: %s", out)
 	} else {
 		t.Log("Saved kubeconfig in config.yaml.")
 	}
