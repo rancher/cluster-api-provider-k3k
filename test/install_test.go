@@ -1,6 +1,7 @@
 package test
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"testing"
@@ -23,15 +24,16 @@ func TestProvisionExampleCluster(t *testing.T) {
 	}
 
 	t.Log("Creating a Kind registry and cluster...")
-	if out, err := runCommand("ctlptl", "apply", "-f", "cluster.yaml"); err != nil {
-		t.Fatalf("failed to create the Kind registry and cluster: %s", out)
+	if err := runCommand("ctlptl", "apply", "-f", "cluster.yaml"); err != nil {
+		t.Fatalf("failed to create the Kind registry and cluster: %s", err)
 	}
 	defer cleanup(t)
 
-	errChan := make(chan string)
+	// Tilt starts a server that will block, so it needs to be started in its own goroutine.
+	errChan := make(chan error)
 	go func() {
-		if out, err := runCommand("tilt", "up", "-f", "../Tiltfile"); err != nil {
-			errChan <- string(out)
+		if err := runCommand("tilt", "up", "--stream", "-f", "../Tiltfile"); err != nil {
+			errChan <- err
 		}
 	}()
 	t.Log("Waiting for Tilt to start running...")
@@ -43,26 +45,26 @@ func TestProvisionExampleCluster(t *testing.T) {
 	}
 
 	t.Log("Waiting for Tilt to finish its tasks...")
-	if out, err := runCommand("bash", "wait.sh"); err != nil {
-		t.Fatalf("failed to wait for Tilt to be fully up: %s", out)
+	if err := runCommand("bash", "wait.sh"); err != nil {
+		t.Fatalf("failed to wait for Tilt to be fully up: %s", err)
 	}
 
-	t.Log("Creating a K3k example cluster resources...")
-	if out, err := runCommand("kubectl", "apply", "-k", "../config/samples"); err != nil {
-		t.Fatalf("failed to apply example resources: %s", out)
+	t.Log("Creating K3k example cluster resources...")
+	if err := runCommand("kubectl", "apply", "-k", "../config/samples"); err != nil {
+		t.Fatalf("failed to apply example resources: %s", err)
 	}
 
 	t.Log("Waiting for the CAPI-based K3k cluster to become ready...")
-	if out, err := runCommand("kubectl", "wait", "--timeout", "5m",
+	if err := runCommand("kubectl", "wait", "--timeout", "5m",
 		"--for", "jsonpath={.status.controlPlaneReady}",
 		"--for", "jsonpath={.status.infrastructureReady}", "cluster/capicluster-sample"); err != nil {
-		t.Fatalf("failed to wait for infrastructure and controlplane statuses: %s", out)
+		t.Fatalf("failed to wait for infrastructure and controlplane statuses: %s", err)
 	}
 
 	t.Log("Trying to get the secret containing the kubeconfig...")
-	if out, err := runCommand("bash", "-c",
+	if err := runCommand("bash", "-c",
 		"kubectl get secret k3kcontrolplane-sample-kubeconfig -o jsonpath={.data.value} | base64 -d > config.yaml"); err != nil {
-		t.Fatalf("failed to find kubeconfig secret: %s", out)
+		t.Fatalf("failed to find kubeconfig secret: %s", err)
 	} else {
 		t.Log("Saved kubeconfig in config.yaml.")
 	}
@@ -70,8 +72,8 @@ func TestProvisionExampleCluster(t *testing.T) {
 
 func cleanup(t *testing.T) {
 	t.Log("Cleaning up the Kind registry and cluster...")
-	if out, err := runCommand("ctlptl", "delete", "-f", "cluster.yaml"); err != nil {
-		t.Fatalf("failed to delete the Kind registry and cluster: %s", out)
+	if err := runCommand("ctlptl", "delete", "-f", "cluster.yaml"); err != nil {
+		t.Errorf("failed to delete the Kind registry and cluster: %s", err)
 	}
 	_ = os.Remove("config.yaml")
 }
@@ -82,7 +84,24 @@ func isCommandAvailable(name string) bool {
 	return err == nil
 }
 
-func runCommand(name string, args ...string) ([]byte, error) {
+func runCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	return cmd.CombinedOutput()
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		_, _ = io.Copy(os.Stdout, stdout)
+	}()
+	go func() {
+		_, _ = io.Copy(os.Stderr, stderr)
+	}()
+	return cmd.Wait()
 }
