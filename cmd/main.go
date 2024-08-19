@@ -26,11 +26,7 @@ import (
 	"github.com/go-logr/stdr"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -46,7 +42,6 @@ import (
 	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 	controlplanecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/controlplane"
 	infrastructurecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/infrastructure"
-	"github.com/rancher-sandbox/cluster-api-provider-k3k/internal/helm"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -138,17 +133,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	restClientGetter, err := newRestClientGetter(mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to set up REST client getter")
-		os.Exit(1)
-	}
-
 	ctx := ctrl.SetupSignalHandler()
 
 	if err = (&controlplanecontroller.K3kControlPlaneReconciler{
 		Client:     mgr.GetClient(),
-		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k-operator", "k3k-internal"),
 		K3KVersion: k3kVersion,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "K3kControlPlane")
@@ -176,22 +164,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func newRestClientGetter(mgr manager.Manager) (*helm.SimpleRESTClientGetter, error) {
-	restConfig := mgr.GetConfig()
-	k8s, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client set: %w", err)
-	}
-	restMapper := mgr.GetRESTMapper()
-	cache := memory.NewMemCacheClient(k8s.Discovery())
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-	return &helm.SimpleRESTClientGetter{
-		ClientConfig:    kubeConfig,
-		RESTConfig:      restConfig,
-		CachedDiscovery: cache,
-		RESTMapper:      restMapper,
-	}, nil
 }

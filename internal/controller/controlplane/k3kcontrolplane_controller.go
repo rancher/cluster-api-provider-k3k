@@ -18,32 +18,29 @@ package controlplane
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
-	"github.com/rancher/k3k/pkg/controller/kubeconfig"
-	"github.com/rancher/k3k/pkg/controller/util"
-	"helm.sh/helm/v3/pkg/storage/driver"
 	v1 "k8s.io/api/core/v1"
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/retry"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
+	"sigs.k8s.io/cluster-api/util/secret"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -62,19 +59,29 @@ const (
 type scope struct {
 	logr.Logger
 
+	// k3kControlPlane is the controlPlane that this particular reconcile action was initiated by
 	k3kControlPlane *controlplanev1.K3kControlPlane
-	cluster         *clusterv1beta1.Cluster
+	// cluster is the cluster which owns the k3kControlPlane
+	cluster *clusterv1beta1.Cluster
+	// hostClient is the client for the cluster which will host the targeted k3k cluster
+	hostClient client.Client
+	// hostHelmClient is the helm client for the cluster which will host the targeted k3k cluster
+	hostHelmClient helm.Client
 }
 
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
 type K3kControlPlaneReconciler struct {
 	client.Client
-	Helm       helm.Client
+	// K3KVersion is the version of the upstream k3k chart to deploy/upgrade to in the cluster
 	K3KVersion string
+	// defaultConfig is the kubeconfig from the current cluster. Used when creating a helm Client for the current
+	// cluster
+	defaultConfig *rest.Config
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager) error {
+	r.defaultConfig = mgr.GetConfig()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controlplanev1.K3kControlPlane{}).
 		Complete(r)
@@ -98,11 +105,6 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if err := r.ensureUpstreamChart(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to ensure upstream K3K release is deployed: %w", err)
-	} else {
-		log.Info("The upstream K3K controller Helm release is deployed without errors.")
-	}
 	k3kControlPlane := &controlplanev1.K3kControlPlane{}
 	err := r.Get(ctx, req.NamespacedName, k3kControlPlane)
 	if err != nil {
@@ -122,11 +124,17 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
 		return ctrl.Result{}, nil
 	}
+	hostClient, hostHelmClient, err := r.getHostClients(ctx, *k3kControlPlane)
+	if err != nil {
+		log.Info("Unable to get host-kubeconfig for controlplane", "controlPlane", k3kControlPlane.Name, "error", err)
+	}
 
 	scope := &scope{
 		Logger:          log,
 		k3kControlPlane: k3kControlPlane,
 		cluster:         cluster,
+		hostClient:      hostClient,
+		hostHelmClient:  *hostHelmClient,
 	}
 
 	if !k3kControlPlane.DeletionTimestamp.IsZero() {
@@ -137,6 +145,11 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *scope) (ctrl.Result, error) {
+	if err := ensureUpstreamChart(ctx, scope, r.K3KVersion); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to ensure upstream K3K release is deployed: %w", err)
+	} else {
+		scope.Info("The upstream K3K controller Helm release is deployed without errors.")
+	}
 	if !controllerutil.ContainsFinalizer(scope.k3kControlPlane, finalizer) {
 		controllerutil.AddFinalizer(scope.k3kControlPlane, finalizer)
 		err := r.Update(ctx, scope.k3kControlPlane)
@@ -146,7 +159,7 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 		}
 	}
 
-	upstreamCluster, err := r.reconcileUpstreamCluster(ctx, scope.k3kControlPlane)
+	upstreamCluster, err := reconcileUpstreamCluster(ctx, scope)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to reconcile k3k cluster: %w", err)
 	}
@@ -164,7 +177,7 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 	var config *clientcmdapi.Config
 	var retryErr error
 	if err := retry.OnError(backoff, apiError.IsNotFound, func() error {
-		config, retryErr = r.getKubeconfig(ctx, upstreamCluster)
+		config, retryErr = getKubeconfig(ctx, scope, upstreamCluster)
 		if retryErr != nil {
 			return retryErr
 		}
@@ -202,171 +215,20 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 	return ctrl.Result{}, nil
 }
 
+// reconcileDelete handles deleting the resources created for this controlplane previously
 func (r *K3kControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *scope) (ctrl.Result, error) {
 	scope.Info("About to remove upstream cluster")
-	if err := r.deleteUpstreamClusters(ctx, scope.k3kControlPlane); err != nil {
+	controlPlane := scope.k3kControlPlane
+	if err := deleteUpstreamClusters(ctx, scope); err != nil {
 		scope.Error(err, "Couldn't remove upstream cluster")
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
-}
-
-// ensureUpstreamChart tries to install a release of the upstream K3K chart or upgrade it if there is a new version.
-func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) error {
-	log := ctrl.LoggerFrom(ctx)
-	if err := r.Helm.ReleasePresent(ctx, r.K3KVersion); err != nil {
-		values := map[string]any{}
-		if errors.Is(err, driver.ErrReleaseNotFound) {
-			if err := r.Helm.DeployLocalChart(ctx, values); err != nil {
-				return fmt.Errorf("failed to deploy a local K3K release: %w", err)
-			}
-			log.Info("Successfully deployed the upstream K3K release.")
-			return nil
-		}
-		if errors.Is(err, helm.ErrReleaseOutdated) {
-			if err := r.Helm.UpgradeLocalChart(ctx, values); err != nil {
-				return fmt.Errorf("failed to upgrade a local K3K release: %w", err)
-			}
-			log.Info("Successfully upgraded the upstream K3K release.")
-			return nil
-		}
-		return fmt.Errorf("couldn't check for the presence of a K3K release: %w", err)
-	}
-	return nil
-}
-
-// reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
-// It doesn't remove clusters if the controlPlane is being deleted.
-func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) (*upstream.Cluster, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	clusters, err := r.getUpstreamClusters(ctx, controlPlane)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current clusters for controlPlane %s/%s: %w", controlPlane.Namespace, controlPlane.Name, err)
-	}
-	spec := upstream.ClusterSpec{
-		Version:     controlPlane.Spec.Version,
-		Servers:     controlPlane.Spec.Servers,
-		Agents:      controlPlane.Spec.Agents,
-		Token:       controlPlane.Spec.Token,
-		ClusterCIDR: controlPlane.Spec.ClusterCIDR,
-		ServiceCIDR: controlPlane.Spec.ServiceCIDR,
-		ClusterDNS:  controlPlane.Spec.ClusterDNS,
-		ServerArgs:  controlPlane.Spec.ServerArgs,
-		AgentArgs:   controlPlane.Spec.AgentArgs,
-		TLSSANs:     controlPlane.Spec.TLSSANs,
-		Addons:      controlPlane.Spec.Addons,
-		Persistence: controlPlane.Spec.Persistence,
-		Expose:      controlPlane.Spec.Expose,
-	}
-	if len(clusters) > 1 {
-		var names []string
-		for i := range clusters {
-			names = append(names, clusters[i].Name)
-		}
-		joinedNames := strings.Join(names, ", ")
-		log.Error(fmt.Errorf("controlplane %s owns two or more clusters: %s, refusing to process further", controlPlane.Name, joinedNames), "need to delete upstream clusters")
-		if err := r.deleteUpstreamClusters(ctx, controlPlane); err != nil {
-			return nil, fmt.Errorf("failed to delete upstream clusters owned by a single controPlane %s: %w", controlPlane.Name, err)
-		}
-		return nil, fmt.Errorf("reprovisioning needed")
-	}
-	if len(clusters) == 0 {
-		// since the upstream cluster type isn't namespaced but we are, we can't use owner refs to control deletion of the cluster
-		upstreamCluster := upstream.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: controlPlane.Name + "-",
-				Labels: map[string]string{
-					ownerNameLabel:      controlPlane.Name,
-					ownerNamespaceLabel: controlPlane.Namespace,
-				},
-			},
-			Spec: spec,
-		}
-		err = r.Create(ctx, &upstreamCluster)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create cluster for controlPlane %s: %w", controlPlane.Name, err)
-		}
-		return &upstreamCluster, nil
-	}
-	// at this point we have exactly one cluster
-	currentCluster := clusters[0].DeepCopy()
-	if reflect.DeepEqual(currentCluster.Spec, spec) {
-		return currentCluster, nil
-	}
-	currentCluster.Spec = spec
-	err = r.Update(ctx, currentCluster)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update cluster for controlPlane %s: %w", controlPlane.Name, err)
-	}
-	return currentCluster, nil
-}
-
-// deleteUpstreamClusters deletes all upstream clusters associated with this controlPlane and removes the finalizer on the controlPlane.
-func (r *K3kControlPlaneReconciler) deleteUpstreamClusters(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	clusters, err := r.getUpstreamClusters(ctx, controlPlane)
-	if err != nil {
-		return fmt.Errorf("unable to get current clusters for controlPlane %s/%s: %w", controlPlane.Namespace, controlPlane.Name, err)
-	}
-	var deleteErrs []error
-	for i := range clusters {
-		if err := r.Delete(ctx, &clusters[i]); err != nil && !apiError.IsNotFound(err) {
-			log.Error(err, "failed to delete upstream cluster "+clusters[i].Name)
-			deleteErrs = append(deleteErrs, err)
-		}
-	}
-	if err := errors.Join(deleteErrs...); err != nil {
-		return fmt.Errorf("failed to delete some upstream clusters: %w", err)
-	}
 	controllerutil.RemoveFinalizer(controlPlane, finalizer)
-	err = r.Update(ctx, controlPlane)
+	err := r.Update(ctx, controlPlane)
 	if err != nil {
-		return fmt.Errorf("unable to update k3k controlplane finalizer after removing clusters: %w", err)
+		return ctrl.Result{}, fmt.Errorf("unable to update k3k controlplane finalizer after removing clusters: %w", err)
 	}
-	return nil
-}
-
-func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, controlPlane *controlplanev1.K3kControlPlane) ([]upstream.Cluster, error) {
-	var currentClusters upstream.ClusterList
-	ownerNameRequirement, err := labels.NewRequirement(ownerNameLabel, selection.Equals, []string{controlPlane.Name})
-	if err != nil {
-		return nil, fmt.Errorf("unable to form label for controlPlane %s: %w", controlPlane.Name, err)
-	}
-	ownerNamespaceRequirement, err := labels.NewRequirement(ownerNamespaceLabel, selection.Equals, []string{controlPlane.Namespace})
-	if err != nil {
-		return nil, fmt.Errorf("unable to form label for controlPlane %s: %w", controlPlane.Name, err)
-	}
-	selector := labels.NewSelector().Add(*ownerNameRequirement).Add(*ownerNamespaceRequirement)
-	err = r.List(ctx, &currentClusters, &client.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return nil, fmt.Errorf("unable to list current clusters %w", err)
-	}
-	return currentClusters.Items, nil
-}
-
-// getKubeconfig retrieves the kubeconfig for the given upstream K3k cluster.
-func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamCluster *upstream.Cluster) (*clientcmdapi.Config, error) {
-	// TODO: We set the expiry to one year here, but we need to continually keep this up to date
-	cfg := kubeconfig.KubeConfig{
-		CN:         util.AdminCommonName,
-		ORG:        []string{user.SystemPrivilegedGroup},
-		ExpiryDate: time.Hour * 24 * 365,
-	}
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get current config to derive hostname: %w", err)
-	}
-	u, err := url.Parse(restConfig.Host)
-	if err != nil {
-		return nil, fmt.Errorf("unable to extract URL from specificed hostname: %s, %w", restConfig.Host, err)
-	}
-	rawKubeConfig, err := cfg.Extract(ctx, r.Client, upstreamCluster, u.Hostname())
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve raw kubeconfig data: %w", err)
-	}
-	return clientcmd.Load(rawKubeConfig)
+	return ctrl.Result{}, nil
 }
 
 // createKubeconfigSecret stores the kubeconfig into a secret which can be retrieved by CAPI later on
@@ -430,6 +292,74 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL
 		return fmt.Errorf("unable to update k3kCluster %s status: %w", k3kCluster.Name, err)
 	}
 	return nil
+}
+
+func (r *K3kControlPlaneReconciler) getHostClients(ctx context.Context, controlPlane controlplanev1.K3kControlPlane) (client.Client, *helm.Client, error) {
+	if controlPlane.Spec.HostKubeconfig == nil {
+		// if the HostKubeconfig isn't set, then the current cluster is the same as the host cluster, so use the client we already have
+		helmClient, err := helmClientForConfig(r.defaultConfig, r.Client)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to contruct clients from default in-cluster config %w", err)
+		}
+		return r.Client, helmClient, nil
+	}
+	var kubeconfigSecret v1.Secret
+	secretKey := client.ObjectKey{
+		Name:      controlPlane.Spec.HostKubeconfig.SecretName,
+		Namespace: controlPlane.Spec.HostKubeconfig.SecretNamespace,
+	}
+	err := r.Get(ctx, secretKey, &kubeconfigSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get specified secret %s/%s: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	kubeconfigBytes, ok := kubeconfigSecret.Data[secret.KubeconfigDataName]
+	if !ok {
+		return nil, nil, fmt.Errorf("secret %s/%s found but no kubeconfig found at key %s", secretKey.Namespace, secretKey.Name, secret.KubeconfigDataName)
+	}
+	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load secret content in kubeconfig %s/%s as a kubeconfig: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	scheme := runtime.NewScheme()
+	err = clientgoscheme.AddToScheme(scheme)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to add basic client-go types to scheme for kubeconfig %s/%s: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	err = upstream.AddToScheme(scheme)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to add upstream k3k types to scheme for kubeconfig %s/%s: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	// note: providing no cache options disables the cache. This is ok since we don't want to read in all objects, but may need to chagne in the future.
+	hostClient, err := client.New(config, client.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create client from kubeconfig %s/%s: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	helmClient, err := helmClientForConfig(config, hostClient)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create helm client from kubeconfig %s/%s: %w", secretKey.Namespace, secretKey.Name, err)
+	}
+	return hostClient, helmClient, nil
+}
+
+func helmClientForConfig(config *rest.Config, client client.Client) (*helm.Client, error) {
+	k8s, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client set: %w", err)
+	}
+	restMapper := client.RESTMapper()
+	cache := memory.NewMemCacheClient(k8s.Discovery())
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	getter := helm.SimpleRESTClientGetter{
+		ClientConfig:    kubeConfig,
+		RESTConfig:      config,
+		CachedDiscovery: cache,
+		RESTMapper:      restMapper,
+	}
+	helmClient := helm.New(&getter, "charts/k3k", "k3k-operator", "k3k-internal")
+	return &helmClient, nil
 }
 
 func serverURLFromKubeConfig(config *clientcmdapi.Config) (*url.URL, error) {
