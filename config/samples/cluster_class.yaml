@@ -1,0 +1,417 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: ClusterClass
+metadata:
+  labels:
+    app.kubernetes.io/name: k3kclustertemplate
+    app.kubernetes.io/instance: k3kclustertemplate-sample
+    app.kubernetes.io/part-of: capi-k3k
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: capi-k3k
+  name: k3k-clusterclass-v0.1.0
+spec:
+  controlPlane:
+    ref:
+      apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+      kind: K3kControlPlaneTemplate
+      name: k3kcontrolplanetemplate-sample
+      namespace: default
+  infrastructure:
+    ref:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+      kind: K3kClusterTemplate
+      name: k3kclustertemplate-sample
+      namespace: default
+  variables:
+    - name: servers
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: Servers is the number of K3s pods to run in server (controlplane) mode.
+          format: int32
+          type: integer
+          default: 1
+    - name: agents
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: Agents is the number of K3s pods to run in agent (worker) mode.
+          format: int32
+          type: integer
+          default: 1
+    - name: token
+      required: true
+      schema:
+        openAPIV3Schema:
+          description: Token is the token used to join the worker nodes to the cluster.
+          type: string
+    - name: clusterCIDR
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: ClusterCIDR is the CIDR range for the pods of the cluster. Defaults to 10.42.0.0/16.
+          type: string
+          default: "10.42.0.0/16"
+    - name: serviceCIDR
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: ServiceCIDR is the CIDR range for the services in thecluster. Defaults to 10.43.0.0/16.
+          type: string
+          default: "10.43.0.0/16"
+    - name: clusterDNS
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: |-
+                  ClusterDNS is the IP address for the coredns service. Needs to be in the range provided by ServiceCIDR or CoreDNS ay not deploy.
+                  Defaults to 10.43.0.10.
+          type: string
+          default: "10.43.0.10"
+    - name: serverArgs
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: ServerArgs are the ordered key value pairs (e.x. "testArg", "testValue") for the K3s pods running in server mode.
+          items:
+            type: string
+          type: array
+    - name: agentArgs
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: AgentArgs are the ordered key value pairs (e.x. "testArg", "testValue") for the K3s pods running in agent mode.
+          items:
+            type: string
+          type: array
+    - name: tlsSANs
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: TLSSANs are the subjectAlternativeNames for the certificate the K3s server will use.
+          items:
+            type: string
+          type: array
+    - name: addons
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: Addons is a list of secrets containing raw YAML which will be deployed in the virtual K3k cluster on startup.
+          items:
+            properties:
+              secretNamespace:
+                type: string
+              secretRef:
+                type: string
+            type: object
+          type: array
+    - name: persistence
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: Persistence contains options controlling how the etcd data of the virtual cluster is persisted. By default, no data persistence is guaranteed, so restart of a virtual cluster pod may result in data loss without this field.
+          properties:
+            storageClassName:
+              type: string
+            storageRequestSize:
+              type: string
+            type:
+              description: Type can be ephermal, static, dynamic
+              type: string
+          required:
+          - type
+          type: object
+    - name: exposeIngress
+      required: false
+      schema:
+        openAPIV3Schema:
+          properties:
+            enabled:
+              type: boolean
+            ingressClassName:
+              type: string
+          required:
+          - enabled
+          - ingressClassName
+          type: object
+          default:
+            enabled: false
+            ingressClassName: "traefik"
+    - name: exposeLoadBalancer
+      required: false
+      schema:
+        openAPIV3Schema:
+          properties:
+            enabled:
+              type: boolean
+          required:
+          - enabled
+          type: object
+          default: 
+            enabled: false
+    - name: exposeNodePort
+      required: false
+      schema:
+        openAPIV3Schema:
+          properties:
+            enabled:
+              type: boolean
+          required:
+          - enabled
+          type: object
+          default: 
+            enabled: false
+    - name: hostKubeconfig
+      required: false
+      schema:
+        openAPIV3Schema:
+          description: HostKubeconfig is the location of the kubeconfig to the host cluster that the K3k cluster should install in. Optional, if not supplied the K3k cluster will be made in the current cluster.
+          properties:
+            secretName:
+              description: SecretName is the name of the secret containing the
+                kubconfig data.
+              type: string
+            secretNamespace:
+              description: SecretNamespace is the namespace of the secret containing
+                the kubeconfig data.
+              type: string
+          required:
+          - secretName
+          - secretNamespace
+          type: object
+  patches:
+  - name: servers
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/servers
+        valueFrom:
+          variable: servers
+  - name: agents 
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/agents
+        valueFrom:
+          variable: agents
+  - name: token
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/token
+        valueFrom:
+          variable: token
+  - name: clusterCIDR
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/clusterCIDR
+        valueFrom:
+          variable: clusterCIDR
+  - name: serviceCIDR
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/serviceCIDR
+        valueFrom:
+          variable: serviceCIDR
+  - name: clusterDNS
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/clusterDNS
+        valueFrom:
+          variable: clusterDNS
+  - name: serverArgs
+    enabledIf: "{{ if .serverArgs}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/serverArgs
+        valueFrom:
+          variable: serverArgs
+  - name: agentArgs
+    enabledIf: "{{ if .agentArgs}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: add 
+        path: /spec/template/spec/agentArgs
+        valueFrom:
+          variable: agentArgs
+  - name: tlsSANs 
+    enabledIf: "{{ if .tlsSANs}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: add
+        path: /spec/template/spec/tlsSANs
+        valueFrom:
+          variable: tlsSANs
+  - name: addons
+    enabledIf: "{{ if .addons}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: add
+        path: /spec/template/spec/addons
+        valueFrom:
+          variable: addons
+  - name: persistence
+    enabledIf: "{{ if .persistence}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: add
+        path: /spec/template/spec/persistence
+        valueFrom:
+          variable: persistence
+  - name: exposeIngress
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/expose/ingress
+        valueFrom:
+          variable: exposeIngress
+  - name: exposeLoadBalancer
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/expose/loadbalancer
+        valueFrom:
+          variable: exposeLoadBalancer
+  - name: exposeNodePort
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: replace
+        path: /spec/template/spec/expose/nodePort
+        valueFrom:
+          variable: exposeNodePort
+  - name: hostKubeconfig
+    enabledIf: "{{ if .hostKubeconfig}}true{{end}}"
+    definitions:
+    - selector: 
+        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        kind: K3kControlPlaneTemplate
+        matchResources:
+          controlPlane: true
+      jsonPatches:
+      - op: add
+        path: /spec/template/spec/hostKubeconfig
+        valueFrom:
+          variable: hostKubeconfig
+---
+# once created, this object will be owned by the cluster class
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+kind: K3kControlPlaneTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: k3kcontrolplanetemplate
+    app.kubernetes.io/instance: k3kcontrolplanetemplate-sample
+    app.kubernetes.io/part-of: capi-k3k
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: capi-k3k
+  name: k3kcontrolplanetemplate-sample
+spec:
+  template:
+    spec:
+      servers: 1
+      agents: 3
+      token: someexamplereplaceme
+      version: v1.26.0-k3s2
+      clusterCIDR: 10.30.0.0/16
+      serviceCIDR: 10.31.0.0/16
+      clusterDNS: 10.31.0.10
+      serverArgs:
+        - "--write-kubeconfig-mode=777"
+      expose:
+        ingress:
+          enabled: false
+          ingressClassName: "traefik"
+        loadbalancer:
+          enabled: false
+        nodePort:
+          enabled: true 
+---
+# once created, this object will be owned by the cluster class
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: K3kClusterTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: k3kclustertemplate
+    app.kubernetes.io/instance: k3kclustertemplate-sample
+    app.kubernetes.io/part-of: capi-k3k
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: capi-k3k
+  name: k3kclustertemplate-sample
+spec:
+  template:
+    spec:
+      controlPlaneEndpoint:
+        host: ""
+        port: 0
