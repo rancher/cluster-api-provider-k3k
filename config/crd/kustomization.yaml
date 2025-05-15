@@ -4,6 +4,8 @@
 resources:
 - bases/infrastructure.cluster.x-k8s.io_k3kclusters.yaml
 - bases/controlplane.cluster.x-k8s.io_k3kcontrolplanes.yaml
+- bases/infrastructure.cluster.x-k8s.io_k3kclustertemplates.yaml
+- bases/controlplane.cluster.x-k8s.io_k3kcontrolplanetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 commonLabels:
@@ -19,6 +21,8 @@ patches:
 #- path: patches/webhook_in_controlplane_k3kcontrolplanes.yaml
 #- path: patches/webhook_in_bootstrap_k3kconfigtemplates.yaml
 #- path: patches/webhook_in_infrastructure_k3kclusters.yaml
+#- path: patches/webhook_in_infrastructure_k3kclustertemplates.yaml
+#- path: patches/webhook_in_controlplane_k3kcontrolplanetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -28,6 +32,8 @@ patches:
 #- path: patches/cainjection_in_controlplane_k3kcontrolplanes.yaml
 #- path: patches/cainjection_in_bootstrap_k3kconfigtemplates.yaml
 #- path: patches/cainjection_in_infrastructure_k3kclusters.yaml
+#- path: patches/cainjection_in_infrastructure_k3kclustertemplates.yaml
+#- path: patches/cainjection_in_controlplane_k3kcontrolplanetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

@@ -1,0 +1,27 @@
+# permissions for end users to view k3kclustertemplates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: k3kclustertemplate-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: capi-k3k
+    app.kubernetes.io/part-of: capi-k3k
+    app.kubernetes.io/managed-by: kustomize
+  name: k3kclustertemplate-viewer-role
+rules:
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - k3kclustertemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - k3kclustertemplates/status
+  verbs:
+  - get
