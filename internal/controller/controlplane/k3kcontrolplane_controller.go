@@ -116,11 +116,11 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
 	}
+
 	if cluster == nil {
 		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
 		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		// TODO WIP
-		// return ctrl.Result{}, nil
+		return ctrl.Result{}, nil
 	}
 
 	scope := &scope{
@@ -283,6 +283,20 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 			},
 			Spec: spec,
 		}
+
+		if err := ctrl.SetControllerReference(controlPlane, &upstreamCluster, r.Scheme()); err != nil {
+			return nil, fmt.Errorf("unable to create cluster for controlPlane %s: %w", controlPlane.Name, err)
+		}
+
+		err := r.Create(ctx, &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: upstreamCluster.Namespace,
+			},
+		})
+		if !apiError.IsAlreadyExists(err) {
+			return nil, fmt.Errorf("unable to create namespace %s for controlPlane %s: %w", upstreamCluster.Namespace, controlPlane.Name, err)
+		}
+
 		err = r.Create(ctx, &upstreamCluster)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create cluster for controlPlane %s: %w", controlPlane.Name, err)
