@@ -137,11 +137,7 @@ func (in *K3kControlPlaneSpec) DeepCopyInto(out *K3kControlPlaneSpec) {
 		*out = make([]k3k_iov1alpha1.Addon, len(*in))
 		copy(*out, *in)
 	}
-	if in.Persistence != nil {
-		in, out := &in.Persistence, &out.Persistence
-		*out = new(k3k_iov1alpha1.PersistenceConfig)
-		**out = **in
-	}
+	in.Persistence.DeepCopyInto(&out.Persistence)
 	if in.Expose != nil {
 		in, out := &in.Expose, &out.Expose
 		*out = new(k3k_iov1alpha1.ExposeConfig)

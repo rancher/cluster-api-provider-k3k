@@ -29,7 +29,6 @@ import (
 	"github.com/go-logr/logr"
 	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
 	"github.com/rancher/k3k/pkg/controller/kubeconfig"
-	"github.com/rancher/k3k/pkg/controller/util"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	v1 "k8s.io/api/core/v1"
 	apiError "k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/retry"
@@ -87,11 +85,12 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters/status,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
 //+kubebuilder:rbac:groups=k3k.io,resources=clusters,verbs=get;list;watch;create;update;delete
-//+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,resourceNames=cluster-admin,verbs=bind
+//+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,verbs=bind;get;create
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;create
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update
-//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;create
+//+kubebuilder:rbac:groups="",resources=nodes;nodes/proxy,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=create
 
@@ -120,7 +119,8 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if cluster == nil {
 		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
 		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		return ctrl.Result{}, nil
+		// TODO WIP
+		// return ctrl.Result{}, nil
 	}
 
 	scope := &scope{
@@ -248,7 +248,6 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 		Version:     controlPlane.Spec.Version,
 		Servers:     controlPlane.Spec.Servers,
 		Agents:      controlPlane.Spec.Agents,
-		Token:       controlPlane.Spec.Token,
 		ClusterCIDR: controlPlane.Spec.ClusterCIDR,
 		ServiceCIDR: controlPlane.Spec.ServiceCIDR,
 		ClusterDNS:  controlPlane.Spec.ClusterDNS,
@@ -276,6 +275,7 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 		upstreamCluster := upstream.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controlPlane.Name + "-",
+				Namespace:    "k3k-" + controlPlane.Name,
 				Labels: map[string]string{
 					ownerNameLabel:      controlPlane.Name,
 					ownerNamespaceLabel: controlPlane.Namespace,
@@ -348,12 +348,11 @@ func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, con
 
 // getKubeconfig retrieves the kubeconfig for the given upstream K3k cluster.
 func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamCluster *upstream.Cluster) (*clientcmdapi.Config, error) {
+
 	// TODO: We set the expiry to one year here, but we need to continually keep this up to date
-	cfg := kubeconfig.KubeConfig{
-		CN:         util.AdminCommonName,
-		ORG:        []string{user.SystemPrivilegedGroup},
-		ExpiryDate: time.Hour * 24 * 365,
-	}
+	cfg := kubeconfig.New()
+	cfg.ExpiryDate = time.Hour * 24 * 365
+
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current config to derive hostname: %w", err)
@@ -362,11 +361,8 @@ func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamC
 	if err != nil {
 		return nil, fmt.Errorf("unable to extract URL from specificed hostname: %s, %w", restConfig.Host, err)
 	}
-	rawKubeConfig, err := cfg.Extract(ctx, r.Client, upstreamCluster, u.Hostname())
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve raw kubeconfig data: %w", err)
-	}
-	return clientcmd.Load(rawKubeConfig)
+
+	return cfg.Generate(ctx, r.Client, upstreamCluster, u.Hostname())
 }
 
 // createKubeconfigSecret stores the kubeconfig into a secret which can be retrieved by CAPI later on

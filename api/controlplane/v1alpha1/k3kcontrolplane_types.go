@@ -32,11 +32,11 @@ type K3kControlPlaneSpec struct {
 	// The following fields are copied from the github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1.ClusterSpec
 
 	// Servers is the number of K3s pods to run in server (controlplane) mode.
-	Servers *int32 `json:"servers"`
+	Servers *int32 `json:"servers,omitempty"`
 	// Agents is the number of K3s pods to run in agent (worker) mode.
-	Agents *int32 `json:"agents"`
+	Agents *int32 `json:"agents,omitempty"`
 	// Token is the token used to join the worker nodes to the cluster.
-	Token string `json:"token"`
+	Token string `json:"token,omitempty"`
 	// ClusterCIDR is the CIDR range for the pods of the cluster. Defaults to 10.42.0.0/16.
 	ClusterCIDR string `json:"clusterCIDR,omitempty"`
 	// ServiceCIDR is the CIDR range for the services in the cluster. Defaults to 10.43.0.0/16.
@@ -54,13 +54,13 @@ type K3kControlPlaneSpec struct {
 	Addons []upstream.Addon `json:"addons,omitempty"`
 	// Persistence contains options controlling how the etcd data of the virtual cluster is persisted. By default, no data
 	// persistence is guaranteed, so restart of a virtual cluster pod may result in data loss without this field.
-	Persistence *upstream.PersistenceConfig `json:"persistence,omitempty"`
+	Persistence upstream.PersistenceConfig `json:"persistence,omitempty"`
 	// Expose contains options for exposing the apiserver inside/outside of the cluster. By default, this is only exposed as a
 	// clusterIP which is relatively secure, but difficult to access outside of the cluster.
 	Expose *upstream.ExposeConfig `json:"expose,omitempty"`
 
 	// Version is a string representing the Kubernetes version to be used by the virtual nodes.
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 }
 
 // HostKubeconfigLocation specifies a source of a kubeconfig used to access a cluster.
