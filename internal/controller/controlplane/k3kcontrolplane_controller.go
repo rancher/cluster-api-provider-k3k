@@ -275,7 +275,7 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 		upstreamCluster := upstream.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controlPlane.Name + "-",
-				Namespace:    "k3k-" + controlPlane.Name,
+				Namespace:    controlPlane.Namespace,
 				Labels: map[string]string{
 					ownerNameLabel:      controlPlane.Name,
 					ownerNamespaceLabel: controlPlane.Namespace,
@@ -286,15 +286,6 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 
 		if err := ctrl.SetControllerReference(controlPlane, &upstreamCluster, r.Scheme()); err != nil {
 			return nil, fmt.Errorf("unable to create cluster for controlPlane %s: %w", controlPlane.Name, err)
-		}
-
-		err := r.Create(ctx, &v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: upstreamCluster.Namespace,
-			},
-		})
-		if !apiError.IsAlreadyExists(err) {
-			return nil, fmt.Errorf("unable to create namespace %s for controlPlane %s: %w", upstreamCluster.Namespace, controlPlane.Name, err)
 		}
 
 		err = r.Create(ctx, &upstreamCluster)
