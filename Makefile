@@ -3,7 +3,7 @@
 IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
-K3K_VERSION = 0.1.4-r1
+K3K_VERSION = 0.3.3
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -125,13 +125,9 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	@if [ -d "config/crd" ]; then \
-		$(KUSTOMIZE) build config/crd > dist/install.yaml; \
-	fi
-	echo "---" >> dist/install.yaml  # Add a document separator before appending
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default >> dist/install.yaml
+	@mkdir -p dist
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 ##@ Deployment
 

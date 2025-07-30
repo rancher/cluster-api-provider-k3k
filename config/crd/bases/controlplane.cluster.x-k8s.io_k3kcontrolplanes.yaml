@@ -43,10 +43,14 @@ spec:
                 description: Addons is a list of secrets containing raw YAML which
                   will be deployed in the virtual K3k cluster on startup.
                 items:
+                  description: Addon specifies a Secret containing YAML to be deployed
+                    on cluster startup.
                   properties:
                     secretNamespace:
+                      description: SecretNamespace is the namespace of the Secret.
                       type: string
                     secretRef:
+                      description: SecretRef is the name of the Secret.
                       type: string
                   type: object
                 type: array
@@ -76,33 +80,58 @@ spec:
                   clusterIP which is relatively secure, but difficult to access outside of the cluster.
                 properties:
                   ingress:
+                    description: Ingress specifies options for exposing the API server
+                      through an Ingress.
                     properties:
-                      enabled:
-                        type: boolean
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations specifies annotations to add to the
+                          Ingress.
+                        type: object
                       ingressClassName:
+                        description: IngressClassName specifies the IngressClass to
+                          use for the Ingress.
                         type: string
-                    required:
-                    - enabled
-                    - ingressClassName
                     type: object
                   loadbalancer:
+                    description: LoadBalancer specifies options for exposing the API
+                      server through a LoadBalancer service.
                     properties:
-                      enabled:
-                        type: boolean
-                    required:
-                    - enabled
+                      etcdPort:
+                        description: |-
+                          ETCDPort is the port on which the ETCD service is exposed when type is LoadBalancer.
+                          If not specified, the default etcd 2379 port will be allocated.
+                          If 0 or negative, the port will not be exposed.
+                        format: int32
+                        type: integer
+                      serverPort:
+                        description: |-
+                          ServerPort is the port on which the K3s server is exposed when type is LoadBalancer.
+                          If not specified, the default https 443 port will be allocated.
+                          If 0 or negative, the port will not be exposed.
+                        format: int32
+                        type: integer
                     type: object
                   nodePort:
+                    description: NodePort specifies options for exposing the API server
+                      through NodePort.
                     properties:
-                      enabled:
-                        type: boolean
-                    required:
-                    - enabled
+                      etcdPort:
+                        description: |-
+                          ETCDPort is the port on each node on which the ETCD service is exposed when type is NodePort.
+                          If not specified, a random port between 30000-32767 will be allocated.
+                          If out of range, the port will not be exposed.
+                        format: int32
+                        type: integer
+                      serverPort:
+                        description: |-
+                          ServerPort is the port on each node on which the K3s server is exposed when type is NodePort.
+                          If not specified, a random port between 30000-32767 will be allocated.
+                          If out of range, the port will not be exposed.
+                        format: int32
+                        type: integer
                     type: object
-                required:
-                - ingress
-                - loadbalancer
-                - nodePort
                 type: object
               hostKubeconfig:
                 description: |-
@@ -127,11 +156,18 @@ spec:
                   persistence is guaranteed, so restart of a virtual cluster pod may result in data loss without this field.
                 properties:
                   storageClassName:
+                    description: |-
+                      StorageClassName is the name of the StorageClass to use for the PVC.
+                      This field is only relevant in "dynamic" mode.
                     type: string
                   storageRequestSize:
+                    description: |-
+                      StorageRequestSize is the requested size for the PVC.
+                      This field is only relevant in "dynamic" mode.
                     type: string
                   type:
-                    description: Type can be ephermal, static, dynamic
+                    default: dynamic
+                    description: Type specifies the persistence mode.
                     type: string
                 required:
                 - type
@@ -165,11 +201,6 @@ spec:
                 description: Version is a string representing the Kubernetes version
                   to be used by the virtual nodes.
                 type: string
-            required:
-            - agents
-            - servers
-            - token
-            - version
             type: object
           status:
             description: Status is the current status of the K3k controlPlane.
@@ -179,24 +210,46 @@ spec:
                   type.
                 properties:
                   clusterCIDR:
+                    description: ClusterCIDR is the CIDR range for pod IPs.
                     type: string
                   clusterDNS:
+                    description: ClusterDNS is the IP address for the CoreDNS service.
+                    type: string
+                  hostVersion:
+                    description: HostVersion is the Kubernetes version of the host
+                      node.
                     type: string
                   persistence:
+                    description: Persistence specifies options for persisting etcd
+                      data.
                     properties:
                       storageClassName:
+                        description: |-
+                          StorageClassName is the name of the StorageClass to use for the PVC.
+                          This field is only relevant in "dynamic" mode.
                         type: string
                       storageRequestSize:
+                        description: |-
+                          StorageRequestSize is the requested size for the PVC.
+                          This field is only relevant in "dynamic" mode.
                         type: string
                       type:
-                        description: Type can be ephermal, static, dynamic
+                        default: dynamic
+                        description: Type specifies the persistence mode.
                         type: string
                     required:
                     - type
                     type: object
+                  policyName:
+                    description: PolicyName specifies the virtual cluster policy name
+                      bound to the virtual cluster.
+                    type: string
                   serviceCIDR:
+                    description: ServiceCIDR is the CIDR range for service IPs.
                     type: string
                   tlsSANs:
+                    description: TLSSANs specifies subject alternative names for the
+                      K3s server certificate.
                     items:
                       type: string
                     type: array
