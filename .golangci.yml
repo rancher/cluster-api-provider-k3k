@@ -1,37 +1,20 @@
+version: "2"
+
 run:
   allow-parallel-runners: true
-linters-settings:
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-  gocyclo:
-    min-complexity: 10
-  misspell:
-    locale: US
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - dupl
     - errcheck
     - errname
     - exhaustive
-    - exportloopref
     - goconst
     - gocritic
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
@@ -42,22 +25,55 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
     - wastedassign
     - whitespace
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 10
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - gochecknoglobals
+          - golint
+          - gosec
+          - noctx
+          - scopelint
+          - staticcheck
+          - unparam
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - golint
-        - staticcheck
-        - scopelint
-        - gochecknoglobals
-        - noctx
-        - unparam
-        - gosec
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
