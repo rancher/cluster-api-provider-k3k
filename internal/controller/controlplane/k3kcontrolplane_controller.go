@@ -353,7 +353,6 @@ func (r *K3kControlPlaneReconciler) getUpstreamClusters(ctx context.Context, con
 
 // getKubeconfig retrieves the kubeconfig for the given upstream K3k cluster.
 func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamCluster *upstream.Cluster) (*clientcmdapi.Config, error) {
-
 	// TODO: We set the expiry to one year here, but we need to continually keep this up to date
 	cfg := kubeconfig.New()
 	cfg.ExpiryDate = time.Hour * 24 * 365
