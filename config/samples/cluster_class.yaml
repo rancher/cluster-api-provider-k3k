@@ -125,41 +125,23 @@ spec:
       schema:
         openAPIV3Schema:
           properties:
-            enabled:
-              type: boolean
             ingressClassName:
               type: string
           required:
-          - enabled
           - ingressClassName
           type: object
           default:
-            enabled: false
             ingressClassName: "traefik"
     - name: exposeLoadBalancer
       required: false
       schema:
         openAPIV3Schema:
-          properties:
-            enabled:
-              type: boolean
-          required:
-          - enabled
           type: object
-          default: 
-            enabled: false
     - name: exposeNodePort
       required: false
       schema:
         openAPIV3Schema:
-          properties:
-            enabled:
-              type: boolean
-          required:
-          - enabled
           type: object
-          default: 
-            enabled: false
     - name: hostKubeconfig
       required: false
       schema:
@@ -180,8 +162,9 @@ spec:
           type: object
   patches:
   - name: servers
+    enabledIf: '{{ if .servers }}true{{ end }}'
     definitions:
-    - selector: 
+    - selector:
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
         kind: K3kControlPlaneTemplate
         matchResources:
@@ -191,7 +174,8 @@ spec:
         path: /spec/template/spec/servers
         valueFrom:
           variable: servers
-  - name: agents 
+  - name: agents
+    enabledIf: '{{ if .agents }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -199,11 +183,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/agents
         valueFrom:
           variable: agents
   - name: token
+    enabledIf: '{{ if .token }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -211,11 +196,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/token
         valueFrom:
           variable: token
   - name: clusterCIDR
+    enabledIf: '{{ if .clusterCIDR }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -223,11 +209,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/clusterCIDR
         valueFrom:
           variable: clusterCIDR
   - name: serviceCIDR
+    enabledIf: '{{ if .serviceCIDR }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -235,11 +222,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/serviceCIDR
         valueFrom:
           variable: serviceCIDR
   - name: clusterDNS
+    enabledIf: '{{ if .clusterDNS }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -247,7 +235,7 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/clusterDNS
         valueFrom:
           variable: clusterDNS
@@ -260,7 +248,7 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/serverArgs
         valueFrom:
           variable: serverArgs
@@ -317,6 +305,7 @@ spec:
         valueFrom:
           variable: persistence
   - name: exposeIngress
+    enabledIf: '{{ if .exposeIngress }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -324,11 +313,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/expose/ingress
         valueFrom:
           variable: exposeIngress
   - name: exposeLoadBalancer
+    enabledIf: '{{ if .exposeLoadBalancer }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -336,11 +326,12 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/expose/loadbalancer
         valueFrom:
           variable: exposeLoadBalancer
   - name: exposeNodePort
+    enabledIf: '{{ if .exposeNodePort }}true{{ end }}'
     definitions:
     - selector: 
         apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
@@ -348,7 +339,7 @@ spec:
         matchResources:
           controlPlane: true
       jsonPatches:
-      - op: replace
+      - op: add
         path: /spec/template/spec/expose/nodePort
         valueFrom:
           variable: exposeNodePort
@@ -383,20 +374,11 @@ spec:
       servers: 1
       agents: 3
       token: someexamplereplaceme
-      version: v1.26.0-k3s2
-      clusterCIDR: 10.30.0.0/16
-      serviceCIDR: 10.31.0.0/16
-      clusterDNS: 10.31.0.10
+      version: v1.31.1-k3s1
       serverArgs:
         - "--write-kubeconfig-mode=777"
       expose:
-        ingress:
-          enabled: false
-          ingressClassName: "traefik"
-        loadbalancer:
-          enabled: false
-        nodePort:
-          enabled: true 
+        nodePort: {}
 ---
 # once created, this object will be owned by the cluster class
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
