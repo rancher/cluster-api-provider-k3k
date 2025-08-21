@@ -62,8 +62,12 @@ provider_repos:
 enable_providers:
   - k3k
 allowed_contexts:
-  - k3d-k3s-default 
+  - k3d-k3s-default
+kustomize_substitutions:
+  CLUSTER_TOPOLOGY: "true"
 ```
+
+The last two lines are only necessary if testing using cluster classes.
 
 Some notes:
 
