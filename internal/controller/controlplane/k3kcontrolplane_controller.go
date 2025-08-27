@@ -46,9 +46,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
-	infrastructurev1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
-	"github.com/rancher-sandbox/cluster-api-provider-k3k/internal/helm"
+	controlplanev1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	infrastructurev1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
 )
 
 const (

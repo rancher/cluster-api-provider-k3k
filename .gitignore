@@ -27,3 +27,5 @@ go.work
 *.swo
 *~
 .tiltbuild
+
+out/
