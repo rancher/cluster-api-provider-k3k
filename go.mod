@@ -1,4 +1,4 @@
-module github.com/rancher-sandbox/cluster-api-provider-k3k
+module github.com/rancher/cluster-api-provider-k3k
 
 go 1.24.2
 

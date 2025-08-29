@@ -7,7 +7,7 @@ layout:
 - go.kubebuilder.io/v4
 multigroup: true
 projectName: capi-k3k
-repo: github.com/rancher-sandbox/cluster-api-provider-k3k
+repo: github.com/rancher/cluster-api-provider-k3k
 resources:
 - api:
     crdVersion: v1
@@ -16,7 +16,7 @@ resources:
   domain: cluster.x-k8s.io
   group: infrastructure
   kind: K3kCluster
-  path: github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1
+  path: github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -25,6 +25,6 @@ resources:
   domain: cluster.x-k8s.io
   group: controlplane
   kind: K3kControlPlane
-  path: github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1
+  path: github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1
   version: v1alpha1
 version: "3"

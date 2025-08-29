@@ -1,19 +1,13 @@
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  labels:
-    app.kubernetes.io/name: k3kcontrolplane
-    app.kubernetes.io/instance: k3kcontrolplane-sample
-    app.kubernetes.io/part-of: capi-k3k
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: capi-k3k
-  name: capicluster-sample 
+  name: capicluster-sample
 spec:
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
     kind: K3kControlPlane
-    name: k3kcontrolplane-sample
+    name: capicluster-sample
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
     kind: K3kCluster
-    name: k3kcluster-sample
+    name: capicluster-sample

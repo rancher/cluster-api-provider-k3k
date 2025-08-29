@@ -42,11 +42,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	controlplanev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/controlplane/v1alpha1"
-	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
-	controlplanecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/controlplane"
-	infrastructurecontroller "github.com/rancher-sandbox/cluster-api-provider-k3k/internal/controller/infrastructure"
-	"github.com/rancher-sandbox/cluster-api-provider-k3k/internal/helm"
+	controlplanev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	infrastructurev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	controlplanecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/controlplane"
+	infrastructurecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/infrastructure"
+	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
 	//+kubebuilder:scaffold:imports
 )
 
