@@ -1,13 +1,7 @@
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
 kind: K3kCluster
 metadata:
-  labels:
-    app.kubernetes.io/name: k3kcluster
-    app.kubernetes.io/instance: k3kcluster-sample
-    app.kubernetes.io/part-of: capi-k3k
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: capi-k3k
-  name: k3kcluster-sample
+  name: capicluster-sample
 spec:
   controlPlaneEndpoint: 
     host: ""

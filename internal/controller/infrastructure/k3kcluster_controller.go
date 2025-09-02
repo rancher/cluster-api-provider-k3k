@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	infrastructurev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	infrastructurev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 )
 
 // K3kClusterReconciler reconciles a K3kCluster object
