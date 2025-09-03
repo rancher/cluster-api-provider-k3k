@@ -9,6 +9,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -91,7 +92,7 @@ func (c *Client) UpgradeLocalChart(ctx context.Context, values map[string]any) e
 
 // helmLogger wraps a logger that will write messages using an expected pattern of a fmt string followed by arguments.
 func helmLogger(log action.DebugLog) action.DebugLog {
-	return func(format string, v ...interface{}) {
+	return func(format string, v ...any) {
 		log(fmt.Sprintf(format, v...))
 	}
 }
