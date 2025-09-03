@@ -7,6 +7,8 @@ kind: Kustomization
 resources:
 - bases/infrastructure.cluster.x-k8s.io_k3kclusters.yaml
 - bases/controlplane.cluster.x-k8s.io_k3kcontrolplanes.yaml
+- bases/infrastructure.cluster.x-k8s.io_k3kclustertemplates.yaml
+- bases/controlplane.cluster.x-k8s.io_k3kcontrolplanetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 commonLabels:

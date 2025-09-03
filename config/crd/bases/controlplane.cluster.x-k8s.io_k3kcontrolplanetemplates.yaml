@@ -1,0 +1,277 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: k3kcontrolplanetemplates.controlplane.cluster.x-k8s.io
+spec:
+  group: controlplane.cluster.x-k8s.io
+  names:
+    kind: K3kControlPlaneTemplate
+    listKind: K3kControlPlaneTemplateList
+    plural: k3kcontrolplanetemplates
+    singular: k3kcontrolplanetemplate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: K3kControlPlaneTemplate is the Schema for the k3kcontrolplanetemplates
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: K3kControlPlaneTemplateSpec defines the desired state of
+              K3kControlPlaneTemplate
+            properties:
+              template:
+                properties:
+                  metadata:
+                    description: |-
+                      ObjectMeta is metadata that all persisted resources must have, which includes all objects
+                      users must create. This is a copy of customizable fields from metav1.ObjectMeta.
+
+
+                      ObjectMeta is embedded in `Machine.Spec`, `MachineDeployment.Template` and `MachineSet.Template`,
+                      which are not top-level Kubernetes objects. Given that metav1.ObjectMeta has lots of special cases
+                      and read-only fields which end up in the generated CRD validation, having it as a subset simplifies
+                      the API and some issues that can impact user experience.
+
+
+                      During the [upgrade to controller-tools@v2](https://github.com/kubernetes-sigs/cluster-api/pull/1054)
+                      for v1alpha2, we noticed a failure would occur running Cluster API test suite against the new CRDs,
+                      specifically `spec.metadata.creationTimestamp in body must be of type string: "null"`.
+                      The investigation showed that `controller-tools@v2` behaves differently than its previous version
+                      when handling types from [metav1](k8s.io/apimachinery/pkg/apis/meta/v1) package.
+
+
+                      In more details, we found that embedded (non-top level) types that embedded `metav1.ObjectMeta`
+                      had validation properties, including for `creationTimestamp` (metav1.Time).
+                      The `metav1.Time` type specifies a custom json marshaller that, when IsZero() is true, returns `null`
+                      which breaks validation because the field isn't marked as nullable.
+
+
+                      In future versions, controller-tools@v2 might allow overriding the type and validation for embedded
+                      types. When that happens, this hack should be revisited.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Annotations is an unstructured key value map stored with a resource that may be
+                          set by external tools to store and retrieve arbitrary metadata. They are not
+                          queryable and should be preserved when modifying objects.
+                          More info: http://kubernetes.io/docs/user-guide/annotations
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Map of string keys and values that can be used to organize and categorize
+                          (scope and select) objects. May match selectors of replication controllers
+                          and services.
+                          More info: http://kubernetes.io/docs/user-guide/labels
+                        type: object
+                    type: object
+                  spec:
+                    description: K3kControlPlaneSpec defines the desired state of
+                      K3kControlPlane
+                    properties:
+                      addons:
+                        description: Addons is a list of secrets containing raw YAML
+                          which will be deployed in the virtual K3k cluster on startup.
+                        items:
+                          description: Addon specifies a Secret containing YAML to
+                            be deployed on cluster startup.
+                          properties:
+                            secretNamespace:
+                              description: SecretNamespace is the namespace of the
+                                Secret.
+                              type: string
+                            secretRef:
+                              description: SecretRef is the name of the Secret.
+                              type: string
+                          type: object
+                        type: array
+                      agentArgs:
+                        description: AgentArgs are the ordered key value pairs (e.x.
+                          "testArg", "testValue") for the K3s pods running in agent
+                          mode.
+                        items:
+                          type: string
+                        type: array
+                      agents:
+                        description: Agents is the number of K3s pods to run in agent
+                          (worker) mode.
+                        format: int32
+                        type: integer
+                      clusterCIDR:
+                        description: ClusterCIDR is the CIDR range for the pods of
+                          the cluster. Defaults to 10.42.0.0/16.
+                        type: string
+                      clusterDNS:
+                        description: |-
+                          ClusterDNS is the IP address for the coredns service. Needs to be in the range provided by ServiceCIDR or CoreDNS may not deploy.
+                          Defaults to 10.43.0.10.
+                        type: string
+                      expose:
+                        description: |-
+                          Expose contains options for exposing the apiserver inside/outside of the cluster. By default, this is only exposed as a
+                          clusterIP which is relatively secure, but difficult to access outside of the cluster.
+                        properties:
+                          ingress:
+                            description: Ingress specifies options for exposing the
+                              API server through an Ingress.
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: Annotations specifies annotations to
+                                  add to the Ingress.
+                                type: object
+                              ingressClassName:
+                                description: IngressClassName specifies the IngressClass
+                                  to use for the Ingress.
+                                type: string
+                            type: object
+                          loadbalancer:
+                            description: LoadBalancer specifies options for exposing
+                              the API server through a LoadBalancer service.
+                            properties:
+                              etcdPort:
+                                description: |-
+                                  ETCDPort is the port on which the ETCD service is exposed when type is LoadBalancer.
+                                  If not specified, the default etcd 2379 port will be allocated.
+                                  If 0 or negative, the port will not be exposed.
+                                format: int32
+                                type: integer
+                              serverPort:
+                                description: |-
+                                  ServerPort is the port on which the K3s server is exposed when type is LoadBalancer.
+                                  If not specified, the default https 443 port will be allocated.
+                                  If 0 or negative, the port will not be exposed.
+                                format: int32
+                                type: integer
+                            type: object
+                          nodePort:
+                            description: NodePort specifies options for exposing the
+                              API server through NodePort.
+                            properties:
+                              etcdPort:
+                                description: |-
+                                  ETCDPort is the port on each node on which the ETCD service is exposed when type is NodePort.
+                                  If not specified, a random port between 30000-32767 will be allocated.
+                                  If out of range, the port will not be exposed.
+                                format: int32
+                                type: integer
+                              serverPort:
+                                description: |-
+                                  ServerPort is the port on each node on which the K3s server is exposed when type is NodePort.
+                                  If not specified, a random port between 30000-32767 will be allocated.
+                                  If out of range, the port will not be exposed.
+                                format: int32
+                                type: integer
+                            type: object
+                        type: object
+                      hostKubeconfig:
+                        description: |-
+                          HostKubeconfig is the location of the kubeconfig to the host cluster that the K3k cluster should install in.
+                          Optional, if not supplied the K3k cluster will be made in the current cluster.
+                        properties:
+                          secretName:
+                            description: SecretName is the name of the secret containing
+                              the kubconfig data.
+                            type: string
+                          secretNamespace:
+                            description: SecretNamespace is the namespace of the secret
+                              containing the kubeconfig data.
+                            type: string
+                        required:
+                        - secretName
+                        - secretNamespace
+                        type: object
+                      persistence:
+                        description: |-
+                          Persistence contains options controlling how the etcd data of the virtual cluster is persisted. By default, no data
+                          persistence is guaranteed, so restart of a virtual cluster pod may result in data loss without this field.
+                        properties:
+                          storageClassName:
+                            description: |-
+                              StorageClassName is the name of the StorageClass to use for the PVC.
+                              This field is only relevant in "dynamic" mode.
+                            type: string
+                          storageRequestSize:
+                            description: |-
+                              StorageRequestSize is the requested size for the PVC.
+                              This field is only relevant in "dynamic" mode.
+                            type: string
+                          type:
+                            default: dynamic
+                            description: Type specifies the persistence mode.
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      serverArgs:
+                        description: ServerArgs are the ordered key value pairs (e.x.
+                          "testArg", "testValue") for the K3s pods running in server
+                          mode.
+                        items:
+                          type: string
+                        type: array
+                      servers:
+                        description: Servers is the number of K3s pods to run in server
+                          (controlplane) mode.
+                        format: int32
+                        type: integer
+                      serviceCIDR:
+                        description: ServiceCIDR is the CIDR range for the services
+                          in the cluster. Defaults to 10.43.0.0/16.
+                        type: string
+                      tlsSANs:
+                        description: TLSSANs are the subjectAlternativeNames for the
+                          certificate the K3s server will use.
+                        items:
+                          type: string
+                        type: array
+                      token:
+                        description: Token is the token used to join the worker nodes
+                          to the cluster.
+                        type: string
+                      version:
+                        description: Version is a string representing the Kubernetes
+                          version to be used by the virtual nodes.
+                        type: string
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
+            type: object
+          status:
+            description: K3kControlPlaneTemplateStatus defines the observed state
+              of K3kControlPlaneTemplate
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
