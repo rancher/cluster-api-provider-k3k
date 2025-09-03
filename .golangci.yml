@@ -4,19 +4,15 @@ run:
   allow-parallel-runners: true
 
 linters:
-  default: none
   enable:
     - bodyclose
     - dupl
-    - errcheck
     - errname
     - exhaustive
     - goconst
     - gocritic
     - goprintffuncname
     - gosec
-    - govet
-    - ineffassign
     - misspell
     - nakedret
     - nilerr
@@ -24,34 +20,12 @@ linters:
     - prealloc
     - rowserrcheck
     - sqlclosecheck
-    - staticcheck
     - unconvert
     - unparam
-    - unused
     - wastedassign
     - whitespace
-  settings:
-    goconst:
-      min-len: 2
-      min-occurrences: 2
-    gocritic:
-      enabled-tags:
-        - diagnostic
-        - experimental
-        - opinionated
-        - performance
-        - style
-    gocyclo:
-      min-complexity: 10
-    misspell:
-      locale: US
+    # - wsl_v5
   exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
     rules:
       - linters:
           - gochecknoglobals
@@ -62,18 +36,24 @@ linters:
           - staticcheck
           - unparam
         path: _test\.go
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 
 formatters:
   enable:
+    - gci
     - gofmt
-    - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    - gofumpt
+  settings:
+    gci:
+      # The default order is `standard > default > custom > blank > dot > alias > localmodule`.
+      custom-order: true
+      sections:
+        - standard
+        - default
+        - alias
+        - localmodule
+        - dot
+        - blank
+    gofmt:
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
