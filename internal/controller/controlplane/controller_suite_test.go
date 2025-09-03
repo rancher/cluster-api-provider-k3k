@@ -28,11 +28,11 @@ func TestController(t *testing.T) {
 	}
 
 	tmpKubebuilderDir := path.Join(os.TempDir(), "kubebuilder")
-	os.Mkdir(tmpKubebuilderDir, 0o755)
+	_ = os.Mkdir(tmpKubebuilderDir, 0o755)
 	tempDir, err := os.MkdirTemp(tmpKubebuilderDir, "envtest-*")
 	fmt.Println(err)
 
-	err = os.CopyFS(tempDir, os.DirFS(binaryAssetsDirectory))
+	_ = os.CopyFS(tempDir, os.DirFS(binaryAssetsDirectory))
 
 	testEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "charts", "k3k", "crds")},
@@ -41,11 +41,11 @@ func TestController(t *testing.T) {
 		Scheme:                buildScheme(),
 	}
 
-	cfg, err := testEnv.Start()
-	_, err = kubernetes.NewForConfig(cfg)
-	_, err = client.New(cfg, client.Options{Scheme: testEnv.Scheme})
+	cfg, _ := testEnv.Start()
+	_, _ = kubernetes.NewForConfig(cfg)
+	_, _ = client.New(cfg, client.Options{Scheme: testEnv.Scheme})
 
-	manager, err := ctrl.NewManager(cfg, ctrl.Options{
+	manager, _ := ctrl.NewManager(cfg, ctrl.Options{
 		// disable the metrics server
 		Metrics: metricsserver.Options{BindAddress: "0"},
 		Scheme:  testEnv.Scheme,
@@ -64,14 +64,14 @@ func TestController(t *testing.T) {
 
 	//////
 
-	err = os.RemoveAll(tmpKubebuilderDir)
+	_ = os.RemoveAll(tmpKubebuilderDir)
 }
 
 func buildScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 
-	clientgoscheme.AddToScheme(scheme)
-	v1alpha1.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = v1alpha1.AddToScheme(scheme)
 
 	return scheme
 }
