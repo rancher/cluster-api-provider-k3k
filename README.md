@@ -44,13 +44,6 @@ k3d registry create --port 51111 # Or use a different port.
 k3d cluster create --registry-use $CONTAINER_NAME:$PORT
 ```
 
-#### Configure the project to use the local registry
-
-Ensure you have GNU sed in your PATH.
-
-```bash
-make configure-local TEST_IMAGE=$CONTAINER_NAME:PORT/controller:latest
-```
 
 #### Clone the upstream [CAPI](https://github.com/kubernetes-sigs/cluster-api) project
 
@@ -80,6 +73,7 @@ Some notes:
 #### In the local copy of the CAPI upstream project, run Tilt
 
 ```bash
+export IMG="$CONTAINER_NAME:$PORT/controller:latest"
 tilt up
 ```
 
