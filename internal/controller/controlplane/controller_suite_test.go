@@ -2,7 +2,6 @@ package controlplane_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,41 +18,55 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestController(t *testing.T) {
+	RegisterTestingT(t)
+
 	binaryAssetsDirectory := os.Getenv("KUBEBUILDER_ASSETS")
 	if binaryAssetsDirectory == "" {
 		binaryAssetsDirectory = "/usr/local/kubebuilder/bin"
 	}
 
 	tmpKubebuilderDir := path.Join(os.TempDir(), "kubebuilder")
-	_ = os.Mkdir(tmpKubebuilderDir, 0o755)
-	tempDir, err := os.MkdirTemp(tmpKubebuilderDir, "envtest-*")
-	fmt.Println(err)
+	err := os.MkdirAll(tmpKubebuilderDir, 0o755)
+	Expect(err).ToNot(HaveOccurred())
 
-	_ = os.CopyFS(tempDir, os.DirFS(binaryAssetsDirectory))
+	tempDir, err := os.MkdirTemp(tmpKubebuilderDir, "envtest-*")
+	Expect(err).ToNot(HaveOccurred())
+
+	err = os.CopyFS(tempDir, os.DirFS(binaryAssetsDirectory))
+	Expect(err).ToNot(HaveOccurred())
 
 	testEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "charts", "k3k", "crds")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "api", "controlplane", "v1alpha1")},
 		ErrorIfCRDPathMissing: true,
 		BinaryAssetsDirectory: tempDir,
 		Scheme:                buildScheme(),
 	}
 
-	cfg, _ := testEnv.Start()
-	_, _ = kubernetes.NewForConfig(cfg)
-	_, _ = client.New(cfg, client.Options{Scheme: testEnv.Scheme})
+	cfg, err := testEnv.Start()
+	Expect(err).ToNot(HaveOccurred())
 
-	manager, _ := ctrl.NewManager(cfg, ctrl.Options{
+	_, err = kubernetes.NewForConfig(cfg)
+	Expect(err).ToNot(HaveOccurred())
+
+	_, err = client.New(cfg, client.Options{Scheme: testEnv.Scheme})
+	Expect(err).ToNot(HaveOccurred())
+
+	manager, err := ctrl.NewManager(cfg, ctrl.Options{
 		// disable the metrics server
 		Metrics: metricsserver.Options{BindAddress: "0"},
 		Scheme:  testEnv.Scheme,
 	})
+	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
 		t.Log("starting manager")
-		t.Log("manager err", manager.Start(context.Background()))
+		startErr := manager.Start(context.Background())
+		Expect(startErr).ToNot(HaveOccurred())
 	}()
 
 	t.Log("waiting for 10s")
@@ -62,16 +75,17 @@ func TestController(t *testing.T) {
 	t.Log("stopping testEnv")
 	t.Log("manager err", testEnv.Stop())
 
-	//////
-
-	_ = os.RemoveAll(tmpKubebuilderDir)
+	err = os.RemoveAll(tmpKubebuilderDir)
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func buildScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = v1alpha1.AddToScheme(scheme)
+	err := clientgoscheme.AddToScheme(scheme)
+	Expect(err).ToNot(HaveOccurred())
+	err = v1alpha1.AddToScheme(scheme)
+	Expect(err).ToNot(HaveOccurred())
 
 	return scheme
 }
