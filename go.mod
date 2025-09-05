@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/stdr v1.2.2
+	github.com/onsi/gomega v1.36.0
 	github.com/rancher/k3k v0.3.3
 	helm.sh/helm/v3 v3.15.3
 	k8s.io/api v0.31.4

@@ -61,8 +61,8 @@ fmt: ## Run go fmt against code.
 	$(GOLANGCI_LINT) fmt ./...
 
 .PHONY: test
-test: manifests generate fmt $(ENVTEST) ## Run tests.
-	go test -v -coverprofile cover.out ./...
+test: manifests generate ## Run tests.
+	go test -v -coverprofile cover.out $$(go list ./... | grep -v /e2e)
 
 .PHONY: lint
 lint: ## Run golangci-lint linter & yamllint
@@ -75,11 +75,11 @@ lint-fix: ## Run golangci-lint linter and perform fixes
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt ## Build manager binary.
+build: manifests generate ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run
-run: manifests generate fmt ## Run a controller from your host.
+run: manifests generate ## Run a controller from your host.
 	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
