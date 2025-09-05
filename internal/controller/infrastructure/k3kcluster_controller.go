@@ -19,9 +19,10 @@ package infrastructure
 import (
 	"context"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	infrastructurev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
 )
