@@ -27,5 +27,6 @@ go.work
 *.swo
 *~
 .tiltbuild
+.envtest
 
 out/
