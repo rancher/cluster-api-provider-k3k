@@ -26,8 +26,16 @@ import (
 // K3kControlPlaneSpec defines the desired state of K3kControlPlane
 type K3kControlPlaneSpec struct {
 	// HostKubeconfig is the location of the kubeconfig to the host cluster that the K3k cluster should install in.
-	// Optional, if not supplied the K3k cluster will be made in the current cluster.
+	// If not supplied the K3k cluster will be made in the current cluster.
+	//
+	// +optional
 	HostKubeconfig *HostKubeconfigLocation `json:"hostKubeconfig,omitempty"`
+
+	// HostTargetNamespace is the host namespace where the virtual cluster will be installed to.
+	// If not provided a namespace with the k3k-<cluster_name> prefix will be created.
+	//
+	// +optional
+	HostTargetNamespace string `json:"hostTargetNamespace,omitempty"`
 
 	// The following fields are copied from the github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1.ClusterSpec
 
