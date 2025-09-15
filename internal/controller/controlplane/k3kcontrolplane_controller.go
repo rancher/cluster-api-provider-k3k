@@ -159,7 +159,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if cluster == nil {
 		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
 		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return ctrl.Result{}, fmt.Errorf("CAPI cluster owner not yet set for control plane %q", k3kControlPlane.Name)
 	}
 
 	scope := &scope{

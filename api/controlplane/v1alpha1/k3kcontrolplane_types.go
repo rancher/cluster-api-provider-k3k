@@ -25,13 +25,13 @@ import (
 
 // K3kControlPlaneSpec defines the desired state of K3kControlPlane
 type K3kControlPlaneSpec struct {
-	// HostKubeconfig is the location of the kubeconfig to the host cluster that the K3k cluster should install in.
-	// If not supplied the K3k cluster will be made in the current cluster.
+	// HostKubeconfig specifies the location of the Kubernetes secret containing the kubeconfig for the host cluster where the K3k cluster will be installed.
+	// If not provided, the K3k cluster will be created in the current context's cluster.
 	//
 	// +optional
 	HostKubeconfig *HostKubeconfigLocation `json:"hostKubeconfig,omitempty"`
 
-	// HostTargetNamespace is the host namespace where the virtual cluster will be installed to.
+	// HostTargetNamespace is the host namespace where the virtual cluster will be installed.
 	// If not provided a namespace with the k3k-<cluster_name> prefix will be created.
 	//
 	// +optional
