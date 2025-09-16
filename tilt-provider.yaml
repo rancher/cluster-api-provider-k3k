@@ -5,12 +5,12 @@ config:
   label: CAPK3K
   go_main: cmd/main.go
   additional_docker_helper_commands: |
-    ENV K3K_VERSION=0.3.3
+    ENV K3K_VERSION=0.3.4
     RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
       gunzip k3k-${K3K_VERSION}.tgz && \
       tar xvf k3k-${K3K_VERSION}.tar && \
       mkdir -p /charts && \
       mv k3k /charts/k3k
   additional_docker_build_commands: |
-    ENV K3K_VERSION=0.3.3
+    ENV K3K_VERSION=0.3.4
     COPY --from=tilt-helper /charts /charts
