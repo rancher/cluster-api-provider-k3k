@@ -421,7 +421,7 @@ func (r *K3kControlPlaneReconciler) getKubeconfig(ctx context.Context, upstreamC
 		return nil, fmt.Errorf("unable to extract URL from specificed hostname: %s, %w", restConfig.Host, err)
 	}
 
-	return cfg.Generate(ctx, r.Host, upstreamCluster, u.Hostname())
+	return cfg.Generate(ctx, r.Host, upstreamCluster, u.Hostname(), 0)
 }
 
 // createKubeconfigSecret stores the kubeconfig into a secret which can be retrieved by CAPI later on
