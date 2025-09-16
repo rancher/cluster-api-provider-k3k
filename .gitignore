@@ -30,3 +30,7 @@ go.work
 .envtest
 
 out/
+
+# e2e
+tests/e2e/logs
+tests/e2e/repository
