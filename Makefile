@@ -64,6 +64,10 @@ fmt: ## Run go fmt against code.
 test: manifests generate ## Run tests.
 	go test -v -coverprofile cover.out $$(go list ./... | grep -v /e2e)
 
+.PHONY: test-e2e
+test-e2e: docker-build build-installer ## Run tests.
+	$(GINKGO) run -v tests/e2e
+
 .PHONY: lint
 lint: ## Run golangci-lint linter & yamllint
 	$(GOLANGCI_LINT) run
@@ -179,10 +183,12 @@ KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 ENVTEST_VERSION ?= v0.0.0-20250505003155-b6c5897febe5
 ENVTEST_K8S_VERSION := 1.31.0
+GINKGO_VERSION ?= v2.23.3
 
 KUBECTL ?= kubectl
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 KUSTOMIZE ?= go run sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+GINKGO ?= go run github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 
 ENVTEST ?= go run sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 ENVTEST_DIR ?= $(shell pwd)/.envtest

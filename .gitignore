@@ -34,3 +34,4 @@ out/
 # e2e
 tests/e2e/logs
 tests/e2e/repository
+tests/e2e/clusters
