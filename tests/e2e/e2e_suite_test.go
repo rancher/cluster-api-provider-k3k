@@ -43,6 +43,7 @@ func TestE2e(t *testing.T) {
 // The local clusterctl repository & the bootstrap cluster are created once and shared across all the tests.
 var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
+	ctx := context.Background()
 
 	configPath, err := os.Getwd()
 	Expect(err).ToNot(HaveOccurred())
@@ -51,7 +52,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Expect(configPath).To(BeAnExistingFile(), "Invalid test suite argument. e2e.config should be an existing file.")
 
 	By("Loading the e2e test configuration from " + configPath)
-	e2eConfig = clusterctl.LoadE2EConfig(context.TODO(), clusterctl.LoadE2EConfigInput{ConfigPath: configPath})
+	e2eConfig = clusterctl.LoadE2EConfig(ctx, clusterctl.LoadE2EConfigInput{ConfigPath: configPath})
 	Expect(e2eConfig).NotTo(BeNil(), "Failed to load E2E config from %s", configPath)
 
 	artifactFolder, err = filepath.Abs(".")
@@ -65,16 +66,16 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		RepositoryFolder: repoPath,
 	}
 
-	clusterctlConfigPath = clusterctl.CreateRepository(context.TODO(), createRepositoryInput)
+	clusterctlConfigPath = clusterctl.CreateRepository(ctx, createRepositoryInput)
 	Expect(clusterctlConfigPath).To(BeAnExistingFile(), "The clusterctl config file does not exists in the local repository: "+repoPath)
 
 	By("Setting up the bootstrap cluster")
-	bootstrapClusterProvider, bootstrapClusterProxy = setupBootstrapCluster(e2eConfig, false)
+	bootstrapClusterProvider, bootstrapClusterProxy = setupBootstrapCluster(ctx, e2eConfig, false)
 
 	clusterctlLogFolder = filepath.Join(artifactFolder, "clusters", bootstrapClusterProxy.GetName())
 
 	By("Initializing the bootstrap cluster")
-	initBootstrapCluster(bootstrapClusterProxy, e2eConfig, clusterctlConfigPath, artifactFolder)
+	initBootstrapCluster(ctx, bootstrapClusterProxy, e2eConfig, clusterctlConfigPath, artifactFolder)
 
 	// encode the e2e config into the byte array.
 	var configBuf bytes.Buffer
@@ -113,20 +114,23 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 // Using a SynchronizedAfterSuite for controlling how to delete resources shared across ParallelNodes (~ginkgo threads).
 // The bootstrap cluster is shared across all the tests, so it should be deleted only after all ParallelNodes completes.
 // The local clusterctl repository is preserved like everything else created into the artifact folder.
-var _ = SynchronizedAfterSuite(func() {
-	// After each ParallelNode.
-}, func() {
-	// After all ParallelNodes.
+var _ = SynchronizedAfterSuite(afterEachParallelNode, afterAllParallelNodes)
 
+// After each ParallelNode.
+func afterEachParallelNode() {}
+
+// After all ParallelNodes.
+func afterAllParallelNodes() {
 	By("Tearing down the management cluster")
-	tearDown(bootstrapClusterProvider, bootstrapClusterProxy)
-})
+	tearDown(context.Background(), bootstrapClusterProvider, bootstrapClusterProxy)
+}
 
-func setupBootstrapCluster(config *clusterctl.E2EConfig, useExistingCluster bool) (bootstrap.ClusterProvider, framework.ClusterProxy) {
+func setupBootstrapCluster(ctx context.Context, config *clusterctl.E2EConfig, useExistingCluster bool) (bootstrap.ClusterProvider, framework.ClusterProxy) {
 	var clusterProvider bootstrap.ClusterProvider
-	kubeconfigPath := ""
+	var kubeconfigPath string
+
 	if !useExistingCluster {
-		clusterProvider = bootstrap.CreateKindBootstrapClusterAndLoadImages(context.TODO(), bootstrap.CreateKindBootstrapClusterAndLoadImagesInput{
+		clusterProvider = bootstrap.CreateKindBootstrapClusterAndLoadImages(ctx, bootstrap.CreateKindBootstrapClusterAndLoadImagesInput{
 			Name:               config.ManagementClusterName,
 			RequiresDockerSock: config.HasDockerProvider(),
 			Images:             config.Images,
@@ -143,7 +147,7 @@ func setupBootstrapCluster(config *clusterctl.E2EConfig, useExistingCluster bool
 			Name:   "capz-e2e",
 			Images: config.Images,
 		}
-		err := bootstrap.LoadImagesToKindCluster(context.TODO(), imagesInput)
+		err := bootstrap.LoadImagesToKindCluster(ctx, imagesInput)
 		Expect(err).NotTo(HaveOccurred(), "Failed to load images to the bootstrap cluster: %s", err)
 	}
 
@@ -155,8 +159,8 @@ func setupBootstrapCluster(config *clusterctl.E2EConfig, useExistingCluster bool
 	return clusterProvider, clusterProxy
 }
 
-func initBootstrapCluster(bootstrapClusterProxy framework.ClusterProxy, config *clusterctl.E2EConfig, clusterctlConfig, artifactFolder string) {
-	clusterctl.InitManagementClusterAndWatchControllerLogs(context.TODO(), clusterctl.InitManagementClusterAndWatchControllerLogsInput{
+func initBootstrapCluster(ctx context.Context, bootstrapClusterProxy framework.ClusterProxy, config *clusterctl.E2EConfig, clusterctlConfig, artifactFolder string) {
+	clusterctl.InitManagementClusterAndWatchControllerLogs(ctx, clusterctl.InitManagementClusterAndWatchControllerLogsInput{
 		ClusterProxy:            bootstrapClusterProxy,
 		ClusterctlConfigPath:    clusterctlConfig,
 		InfrastructureProviders: config.InfrastructureProviders(),
@@ -165,12 +169,12 @@ func initBootstrapCluster(bootstrapClusterProxy framework.ClusterProxy, config *
 	}, config.GetIntervals(bootstrapClusterProxy.GetName(), "wait-controllers")...)
 }
 
-func tearDown(bootstrapClusterProvider bootstrap.ClusterProvider, bootstrapClusterProxy framework.ClusterProxy) {
+func tearDown(ctx context.Context, bootstrapClusterProvider bootstrap.ClusterProvider, bootstrapClusterProxy framework.ClusterProxy) {
 	if bootstrapClusterProxy != nil {
-		bootstrapClusterProxy.Dispose(context.TODO())
+		bootstrapClusterProxy.Dispose(ctx)
 	}
 	if bootstrapClusterProvider != nil {
-		bootstrapClusterProvider.Dispose(context.TODO())
+		bootstrapClusterProvider.Dispose(ctx)
 	}
 }
 
