@@ -115,7 +115,7 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	rm Dockerfile.cross
 
 .PHONY: build-installer
-build-installer: manifests generate set-manifest-image ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: $(RELEASE_DIR) manifests generate set-manifest-image ## Generate a consolidated YAML with CRDs and deployment.
 	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/infrastructure-components.yaml
 
 ##@ Deployment
