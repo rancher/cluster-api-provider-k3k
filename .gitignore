@@ -32,6 +32,4 @@ go.work
 out/
 
 # e2e
-tests/e2e/logs
-tests/e2e/repository
-tests/e2e/clusters
+tests/e2e/_artifacts
