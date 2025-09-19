@@ -1,0 +1,38 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+    kind: K3kControlPlane
+    name: ${CLUSTER_NAME}
+    namespace: ${NAMESPACE}
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: K3kCluster
+    name: ${CLUSTER_NAME}
+    namespace: ${NAMESPACE}
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: K3kCluster
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  controlPlaneEndpoint:
+    host: ""
+    port: 0
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+kind: K3kControlPlane
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  servers: ${CONTROL_PLANE_MACHINE_COUNT:=1}
+  agents: ${WORKER_MACHINE_COUNT:=1}
+  version: ${KUBERNETES_VERSION}-k3s1
+  expose:
+    nodePort: {}
