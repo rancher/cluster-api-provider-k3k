@@ -58,3 +58,8 @@ providers:
         type: "url"
         files:
           - sourcePath: "../../metadata.yaml"
+          - sourcePath: "../../templates/cluster-template.yaml"
+
+variables:
+  INFRASTRUCTURE_PROVIDER: "k3k"
+  KUBERNETES_VERSION: "v1.31.1"

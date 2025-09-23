@@ -24,7 +24,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 RELEASE_DIR := out
-
+TEMPLATES_DIR := templates
 
 .PHONY: all
 all: build
@@ -150,6 +150,7 @@ $(RELEASE_DIR):
 release: clean-release  ## Builds and push container images using the latest git tag for the commit.
 	$(MAKE) set-manifest-image
 	$(MAKE) release-manifests
+	$(MAKE) release-templates
 	$(MAKE) release-metadata
 
 .PHONY: set-manifest-image
@@ -160,6 +161,10 @@ set-manifest-image: ## Update kustomize image patch file for default resource.
 .PHONY: release-manifests
 release-manifests: $(RELEASE_DIR) ## Builds the manifests to publish with a release.
 	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/infrastructure-components.yaml
+
+.PHONY: release-templates
+release-templates: $(RELEASE_DIR)
+	cp templates/*.yaml $(RELEASE_DIR)/
 
 .PHONY: release-metadata
 release-metadata: $(RELEASE_DIR)

@@ -15,10 +15,12 @@ import (
 	"github.com/go-logr/stdr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/bootstrap"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -118,6 +120,10 @@ func createClusterctlLocalRepository(ctx context.Context, configPath string, art
 	e2eConfig = clusterctl.LoadE2EConfig(ctx, clusterctl.LoadE2EConfigInput{ConfigPath: configPath})
 	Expect(e2eConfig).NotTo(BeNil(), "Failed to load E2E config from %s", configPath)
 
+	// set default intervals
+	e2eConfig.Intervals = map[string][]string{}
+	e2eConfig.Intervals["default/wait-cluster"] = []string{"3m"}
+
 	repositoryFolder := filepath.Join(artifactFolder, "repository")
 
 	createRepositoryInput := clusterctl.CreateRepositoryInput{
@@ -204,8 +210,55 @@ func tearDown(ctx context.Context, bootstrapClusterProvider bootstrap.ClusterPro
 	}
 }
 
-var _ = When("install", func() {
-	It("ok", func() {
-		By("eyah")
+func noOpWaiter(ctx context.Context, input clusterctl.ApplyCustomClusterTemplateAndWaitInput, result *clusterctl.ApplyCustomClusterTemplateAndWaitResult) {
+}
+
+var _ = When("creating a Cluster from the cluster-template", func() {
+	It("works", func() {
+		specName := "cluster-template"
+
+		ctx := context.Background()
+		logFolder := filepath.Join(artifactFolder, "clusters", bootstrapClusterProxy.GetName())
+
+		By("Creating a namespace for the test")
+
+		namespace, cancelWatches := framework.CreateNamespaceAndWatchEvents(ctx, framework.CreateNamespaceAndWatchEventsInput{
+			Creator:   bootstrapClusterProxy.GetClient(),
+			ClientSet: bootstrapClusterProxy.GetClientSet(),
+			Name:      specName,
+			LogFolder: logFolder,
+		})
+
+		defer cancelWatches()
+		defer framework.DeleteNamespace(ctx, framework.DeleteNamespaceInput{
+			Deleter: bootstrapClusterProxy.GetClient(),
+			Name:    namespace.Name,
+		})
+
+		input := clusterctl.ApplyClusterTemplateAndWaitInput{
+			ClusterProxy: bootstrapClusterProxy,
+			ConfigCluster: clusterctl.ConfigClusterInput{
+				Namespace:                namespace.Name,
+				ClusterName:              "cluster-" + utilrand.String(5),
+				ClusterctlConfigPath:     clusterctlConfigPath,
+				KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
+				InfrastructureProvider:   e2eConfig.GetVariableOrEmpty("INFRASTRUCTURE_PROVIDER"),
+				Flavor:                   e2eConfig.GetVariableOrEmpty("CONTROL_PLANE_FLAVOR"),
+				KubernetesVersion:        e2eConfig.GetVariableOrEmpty("KUBERNETES_VERSION"),
+				ControlPlaneMachineCount: ptr.To[int64](1),
+				WorkerMachineCount:       ptr.To[int64](1),
+				LogFolder:                logFolder,
+			},
+			WaitForClusterIntervals: e2eConfig.GetIntervals(specName, "wait-cluster"),
+			ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
+				WaitForControlPlaneInitialized:   noOpWaiter,
+				WaitForControlPlaneMachinesReady: noOpWaiter,
+			},
+		}
+
+		var result clusterctl.ApplyClusterTemplateAndWaitResult
+		clusterctl.ApplyClusterTemplateAndWait(ctx, input, &result)
+
+		Expect(result.Cluster).ToNot(BeNil(), "The returned Cluster object should not be nil")
 	})
 })
