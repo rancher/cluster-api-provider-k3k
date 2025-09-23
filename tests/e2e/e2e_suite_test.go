@@ -235,7 +235,6 @@ var _ = When("creating a Cluster from the cluster-template", func() {
 			Name:    namespace.Name,
 		})
 
-		// The input for our main test function.
 		input := clusterctl.ApplyClusterTemplateAndWaitInput{
 			ClusterProxy: bootstrapClusterProxy,
 			ConfigCluster: clusterctl.ConfigClusterInput{
