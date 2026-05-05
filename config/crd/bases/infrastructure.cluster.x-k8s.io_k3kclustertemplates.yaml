@@ -109,8 +109,6 @@ spec:
                             minimum: 1
                             type: integer
                         type: object
-                    required:
-                    - controlPlaneEndpoint
                     type: object
                 required:
                 - spec

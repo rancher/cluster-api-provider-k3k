@@ -57,8 +57,6 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
-            required:
-            - controlPlaneEndpoint
             type: object
           status:
             description: Status is the current status.

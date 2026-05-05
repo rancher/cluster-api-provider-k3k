@@ -6,5 +6,5 @@ resources:
 
 images:
 - name: controller
-  newName: controller
-  newTag: latest
+  newName: ghcr.io/rancher/cluster-api-provider-k3k
+  newTag: dev

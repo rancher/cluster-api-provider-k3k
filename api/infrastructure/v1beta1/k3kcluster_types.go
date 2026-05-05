@@ -25,7 +25,8 @@ import (
 type K3kClusterSpec struct {
 	// ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
 	// time by the end user, the controller will fill this in when provisioning is complete.
-	ControlPlaneEndpoint clusterv1beta2.APIEndpoint `json:"controlPlaneEndpoint"`
+	// +optional
+	ControlPlaneEndpoint clusterv1beta2.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 }
 
 // K3kClusterStatus defines the observed state of K3kCluster.
