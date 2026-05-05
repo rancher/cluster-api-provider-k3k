@@ -1,7 +1,8 @@
 
-image_name = os.getenv('TEST_IMAGE', 'localhost:5005/controller:latest')
+image_name = os.getenv('IMG', 'localhost:5005/controller:latest')
 
 local_resource('Set up CAPI operator', cmd='clusterctl init')
-docker_build(image_name, '.', build_args={'K3K_VERSION': '0.3.4'})
+docker_build(image_name, '.', build_args={'K3K_VERSION': '1.0.2'})
 
-k8s_yaml(kustomize('config/default', images={'controller': image_name}))
+k8s_yaml(kustomize('config/default'))
+

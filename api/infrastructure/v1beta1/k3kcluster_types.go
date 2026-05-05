@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // K3kClusterSpec defines the desired state of K3kCluster
 type K3kClusterSpec struct {
 	// ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
 	// time by the end user, the controller will fill this in when provisioning is complete.
-	ControlPlaneEndpoint clusterv1beta1.APIEndpoint `json:"controlPlaneEndpoint"`
+	ControlPlaneEndpoint clusterv1beta2.APIEndpoint `json:"controlPlaneEndpoint"`
 }
 
 // K3kClusterStatus defines the observed state of K3kCluster.

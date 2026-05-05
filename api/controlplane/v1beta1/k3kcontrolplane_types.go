@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
+	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -37,7 +37,7 @@ type K3kControlPlaneSpec struct {
 	// +optional
 	HostTargetNamespace string `json:"hostTargetNamespace,omitempty"`
 
-	// The following fields are copied from the github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1.ClusterSpec
+	// The following fields are copied from the github.com/rancher/k3k/pkg/apis/k3k.io/v1beta1.ClusterSpec
 
 	// Servers is the number of K3s pods to run in server (controlplane) mode.
 	Servers *int32 `json:"servers,omitempty"`

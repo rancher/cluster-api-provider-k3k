@@ -11,29 +11,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-// Important: Run "make" to regenerate code after modifying this file
 
-// K3kControlPlaneTemplateSpec defines the desired state of K3kControlPlaneTemplate
-type K3kControlPlaneTemplateSpec struct {
-	Template K3kControlPlaneTemplateConfig `json:"template"`
+// K3kClusterTemplateSpec defines the desired state of K3kClusterTemplate
+type K3kClusterTemplateSpec struct {
+	Template K3kClusterTemplateConfig `json:"template"`
 }
 
-type K3kControlPlaneTemplateConfig struct {
-	ObjectMeta clusterv1beta1.ObjectMeta `json:"metadata,omitempty"`
-	Spec       K3kControlPlaneSpec       `json:"spec"`
+type K3kClusterTemplateConfig struct {
+	ObjectMeta clusterv1beta2.ObjectMeta `json:"metadata,omitempty"`
+	Spec       K3kClusterSpec            `json:"spec"`
 }
 
-// K3kControlPlaneTemplateStatus defines the observed state of K3kControlPlaneTemplate
-type K3kControlPlaneTemplateStatus struct {
+// K3kClusterTemplateStatus defines the observed state of K3kClusterTemplate
+type K3kClusterTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +40,24 @@ type K3kControlPlaneTemplateStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// K3kControlPlaneTemplate is the Schema for the k3kcontrolplanetemplates API
-type K3kControlPlaneTemplate struct {
+// K3kClusterTemplate is the Schema for the k3kclustertemplates API
+type K3kClusterTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   K3kControlPlaneTemplateSpec   `json:"spec,omitempty"`
-	Status K3kControlPlaneTemplateStatus `json:"status,omitempty"`
+	Spec   K3kClusterTemplateSpec   `json:"spec,omitempty"`
+	Status K3kClusterTemplateStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// K3kControlPlaneTemplateList contains a list of K3kControlPlaneTemplate
-type K3kControlPlaneTemplateList struct {
+// K3kClusterTemplateList contains a list of K3kClusterTemplate
+type K3kClusterTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []K3kControlPlaneTemplate `json:"items"`
+	Items           []K3kClusterTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&K3kControlPlaneTemplate{}, &K3kControlPlaneTemplateList{})
+	SchemeBuilder.Register(&K3kClusterTemplate{}, &K3kClusterTemplateList{})
 }

@@ -49,6 +49,8 @@ rules:
   - customresourcedefinitions
   verbs:
   - create
+  - get
+  - list
 - apiGroups:
   - apps
   resources:

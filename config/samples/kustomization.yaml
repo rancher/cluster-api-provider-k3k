@@ -3,8 +3,8 @@ kind: Kustomization
 
 ## Append samples of your project ##
 resources:
-- controlplane_v1alpha1_k3kcontrolplane.yaml
-- infrastructure_v1alpha1_k3kcluster.yaml
+- controlplane_v1beta1_k3kcontrolplane.yaml
+- infrastructure_v1beta1_k3kcluster.yaml
 - capi_cluster.yaml
 - capi_cluster_class.yaml
 - cluster_class.yaml

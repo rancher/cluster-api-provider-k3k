@@ -37,18 +37,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
+	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	apiError "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	capiKubeconfig "sigs.k8s.io/cluster-api/util/kubeconfig"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	controlplanev1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
-	infrastructurev1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	controlplanev1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
+	infrastructurev1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
 	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
 )
 
@@ -62,7 +62,7 @@ type scope struct {
 	logr.Logger
 
 	k3kControlPlane *controlplanev1.K3kControlPlane
-	cluster         *clusterv1beta1.Cluster
+	cluster         *clusterv1beta2.Cluster
 }
 
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
@@ -94,7 +94,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;create
 //+kubebuilder:rbac:groups="",resources=nodes;nodes/proxy,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
-//+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=create
+//+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=get;list;create
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -451,10 +451,9 @@ func (r *K3kControlPlaneReconciler) createKubeconfigSecret(ctx context.Context, 
 	return nil
 }
 
-func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL *url.URL, capiCluster *clusterv1beta1.Cluster) error {
+func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL *url.URL, capiCluster *clusterv1beta2.Cluster) error {
 	clusterRef := capiCluster.Spec.InfrastructureRef
-	groupVersion := infrastructurev1.GroupVersion
-	if clusterRef == nil || clusterRef.APIVersion != groupVersion.String() && clusterRef.Kind != "K3kCluster" {
+	if clusterRef.Kind != "K3kCluster" {
 		return fmt.Errorf("unable to update cluster, infrastructure is not for a k3k cluster %v", clusterRef)
 	}
 	k3kObjectKey := client.ObjectKey{

@@ -11,13 +11,13 @@ metadata:
 spec:
   controlPlane:
     ref:
-      apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+      apiVersion: controlplane.cluster.x-k8s.io/v1beta1
       kind: K3kControlPlaneTemplate
       name: k3kcontrolplanetemplate-sample
       namespace: default
   infrastructure:
     ref:
-      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
       kind: K3kClusterTemplate
       name: k3kclustertemplate-sample
       namespace: default
@@ -165,7 +165,7 @@ spec:
     enabledIf: '{{ if .servers }}true{{ end }}'
     definitions:
     - selector:
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -178,7 +178,7 @@ spec:
     enabledIf: '{{ if .agents }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -191,7 +191,7 @@ spec:
     enabledIf: '{{ if .token }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -204,7 +204,7 @@ spec:
     enabledIf: '{{ if .clusterCIDR }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -217,7 +217,7 @@ spec:
     enabledIf: '{{ if .serviceCIDR }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -230,7 +230,7 @@ spec:
     enabledIf: '{{ if .clusterDNS }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -243,7 +243,7 @@ spec:
     enabledIf: "{{ if .serverArgs}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -256,7 +256,7 @@ spec:
     enabledIf: "{{ if .agentArgs}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -269,7 +269,7 @@ spec:
     enabledIf: "{{ if .tlsSANs}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -282,7 +282,7 @@ spec:
     enabledIf: "{{ if .addons}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -295,7 +295,7 @@ spec:
     enabledIf: "{{ if .persistence}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -308,7 +308,7 @@ spec:
     enabledIf: '{{ if .exposeIngress }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -321,7 +321,7 @@ spec:
     enabledIf: '{{ if .exposeLoadBalancer }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -334,7 +334,7 @@ spec:
     enabledIf: '{{ if .exposeNodePort }}true{{ end }}'
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -347,7 +347,7 @@ spec:
     enabledIf: "{{ if .hostKubeconfig}}true{{end}}"
     definitions:
     - selector: 
-        apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
         kind: K3kControlPlaneTemplate
         matchResources:
           controlPlane: true
@@ -358,7 +358,7 @@ spec:
           variable: hostKubeconfig
 ---
 # once created, this object will be owned by the cluster class
-apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
 kind: K3kControlPlaneTemplate
 metadata:
   labels:
@@ -381,7 +381,7 @@ spec:
         nodePort: {}
 ---
 # once created, this object will be owned by the cluster class
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: K3kClusterTemplate
 metadata:
   labels:

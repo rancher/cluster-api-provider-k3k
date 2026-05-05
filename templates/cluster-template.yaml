@@ -5,17 +5,15 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   controlPlaneRef:
-    apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
     kind: K3kControlPlane
     name: ${CLUSTER_NAME}
     namespace: ${NAMESPACE}
   infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
     kind: K3kCluster
     name: ${CLUSTER_NAME}
     namespace: ${NAMESPACE}
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: K3kCluster
 metadata:
   name: ${CLUSTER_NAME}
@@ -25,7 +23,7 @@ spec:
     host: ""
     port: 0
 ---
-apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
 kind: K3kControlPlane
 metadata:
   name: ${CLUSTER_NAME}

@@ -17,7 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
+	"github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
 
 	. "github.com/onsi/gomega"
 )
@@ -41,7 +41,7 @@ func TestController(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	testEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "api", "controlplane", "v1alpha1")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "api", "controlplane", "v1beta1")},
 		ErrorIfCRDPathMissing: true,
 		BinaryAssetsDirectory: tempDir,
 		Scheme:                buildScheme(),
@@ -84,7 +84,7 @@ func buildScheme() *runtime.Scheme {
 
 	err := clientgoscheme.AddToScheme(scheme)
 	Expect(err).ToNot(HaveOccurred())
-	err = v1alpha1.AddToScheme(scheme)
+	err = v1beta1.AddToScheme(scheme)
 	Expect(err).ToNot(HaveOccurred())
 
 	return scheme
