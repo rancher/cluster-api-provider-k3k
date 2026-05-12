@@ -5,55 +5,37 @@ run:
 
 linters:
   enable:
-    - bodyclose
-    - dupl
-    - errname
-    - exhaustive
-    - goconst
-    - gocritic
-    - goprintffuncname
-    - gosec
-    - misspell
-    - nakedret
-    - nilerr
-    - noctx
-    - prealloc
-    - rowserrcheck
-    - sqlclosecheck
-    - unconvert
-    - unparam
-    - wastedassign
-    - whitespace
-    # - wsl_v5
+  - misspell
+  - wsl_v5
   exclusions:
     rules:
-      - linters:
-          - gochecknoglobals
-          - golint
-          - gosec
-          - noctx
-          - scopelint
-          - staticcheck
-          - unparam
-        path: _test\.go
+    - path: cmd
+      linters:
+      - wsl_v5
+    - path: internal
+      linters:
+      - wsl_v5
+    - path: tests
+      linters:
+      - wsl_v5
 
 formatters:
   enable:
-    - gci
-    - gofmt
-    - gofumpt
+  - gci
+  - gofmt
+  - gofumpt
   settings:
     gci:
       # The default order is `standard > default > custom > blank > dot > alias > localmodule`.
       custom-order: true
       sections:
-        - standard
-        - default
-        - alias
-        - localmodule
-        - dot
-        - blank
+      - standard
+      - default
+      - alias
+      - localmodule
+      - dot
+      - blank
     gofmt:
       rewrite-rules:
-        - pattern: 'interface{}'
-          replacement: 'any'
+      - pattern: 'interface{}'
+        replacement: 'any'
