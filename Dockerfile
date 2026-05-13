@@ -2,12 +2,15 @@ FROM golang:1.24 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG K3K_VERSION
+
+ENV K3K_VERSION=0.3.4
+ENV K3K_CHECKSUM=bfac6ec18a5a25dfe1d1ad35b4c09be6e3c8c7739c5230655c1eba3f9f39585d
 
 WORKDIR /workspace
 
 # Download and unzip the upstream K3K chart.
 RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
+    echo "${K3K_CHECKSUM}  k3k-${K3K_VERSION}.tgz" | sha256sum --check && \
     gunzip k3k-${K3K_VERSION}.tgz && \
     tar xvf k3k-${K3K_VERSION}.tar && \
     mkdir -p charts && \
@@ -36,6 +39,7 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/charts /charts
 USER 65532:65532
-ARG K3K_VERSION
-ENV K3K_VERSION=${K3K_VERSION}
+
+ENV K3K_VERSION=0.3.4
+
 ENTRYPOINT ["/manager"]
