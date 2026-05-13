@@ -39,6 +39,7 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/charts /charts
 USER 65532:65532
-ARG K3K_VERSION
-ENV K3K_VERSION=${K3K_VERSION}
+
+ENV K3K_VERSION=0.3.4
+
 ENTRYPOINT ["/manager"]
