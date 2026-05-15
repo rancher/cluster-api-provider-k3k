@@ -31,9 +31,8 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -85,7 +84,7 @@ func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl
 //+kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=k3kcontrolplanes/finalizers,verbs=update
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=k3kclusters/status,verbs=get;list;watch;create;update
-//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=k3k.io,resources=clusters,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,verbs=bind;get;create
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;create
@@ -185,21 +184,8 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 	}
 	scope.Info("Reconciled upstream cluster for controlPlane", "upstreamCluster", upstreamCluster, "controlPlane", scope.k3kControlPlane.Name)
 
-	backoff := wait.Backoff{
-		Steps:    5,
-		Duration: 20 * time.Second,
-		Factor:   2,
-		Jitter:   0.1,
-	}
-	var config *clientcmdapi.Config
-	var retryErr error
-	if err := retry.OnError(backoff, apiError.IsNotFound, func() error {
-		config, retryErr = r.getKubeconfig(ctx, upstreamCluster)
-		if retryErr != nil {
-			return retryErr
-		}
-		return nil
-	}); err != nil {
+	config, err := r.getKubeconfig(ctx, upstreamCluster)
+	if err != nil {
 		scope.Error(err, "Hard failure when getting kubeconfig for cluster", "clusterName", upstreamCluster.Name)
 		return ctrl.Result{}, fmt.Errorf("unable to get kubeconfig secret")
 	}
@@ -208,11 +194,13 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 		scope.Error(err, "Unable to store kubeconfig as a secret")
 		return ctrl.Result{}, fmt.Errorf("unable to store kubeconfig secret")
 	}
+
 	serverURL, err := serverURLFromKubeConfig(config)
 	if err != nil {
 		scope.Error(err, "Unable to get serverURL from kubeconfig")
 		return ctrl.Result{}, fmt.Errorf("unable to resolve server url")
 	}
+
 	err = r.updateCluster(ctx, serverURL, scope.cluster)
 	if err != nil {
 		scope.Error(err, "Unable to update capiCluster")
@@ -460,10 +448,12 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL
 		Name:      clusterRef.Name,
 		Namespace: capiCluster.Namespace,
 	}
+
 	var k3kCluster infrastructurev1.K3kCluster
 	if err := r.Get(ctx, k3kObjectKey, &k3kCluster); err != nil {
 		return fmt.Errorf("unable to get k3k cluster %s/%s: %w", k3kObjectKey.Namespace, k3kObjectKey.Name, err)
 	}
+
 	k3kCluster = *k3kCluster.DeepCopy()
 	host := serverURL.Hostname()
 	k3kCluster.Spec.ControlPlaneEndpoint.Host = host
@@ -475,14 +465,34 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL
 		}
 		k3kCluster.Spec.ControlPlaneEndpoint.Port = int32(intPort)
 	}
+
 	if err := r.Update(ctx, &k3kCluster); err != nil {
 		return fmt.Errorf("unable to update k3kCluster %s with host and port: %w", k3kCluster.Name, err)
 	}
+
 	k3kCluster.Status = infrastructurev1.K3kClusterStatus{}
 	k3kCluster.Status.Ready = true
+
 	if err := r.Status().Update(ctx, &k3kCluster); err != nil {
 		return fmt.Errorf("unable to update k3kCluster %s status: %w", k3kCluster.Name, err)
 	}
+
+	// Update the CAPI Cluster's control plane endpoint
+	capiCluster = capiCluster.DeepCopy()
+	capiCluster.Spec.ControlPlaneEndpoint.Host = host
+	capiCluster.Spec.ControlPlaneEndpoint.Port = 443 // k3kCluster.Spec.ControlPlaneEndpoint.Port
+
+	if err := r.Update(ctx, capiCluster); err != nil {
+		return fmt.Errorf("unable to update CAPI cluster %s with control plane endpoint: %w", capiCluster.Name, err)
+	}
+
+	capiCluster.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
+	capiCluster.Status.Initialization.InfrastructureProvisioned = ptr.To(true)
+
+	if err := r.Status().Update(ctx, capiCluster); err != nil {
+		return fmt.Errorf("unable to update CAPI cluster %s with control plane endpoint: %w", capiCluster.Name, err)
+	}
+
 	return nil
 }
 
