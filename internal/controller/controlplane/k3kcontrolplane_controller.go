@@ -275,20 +275,8 @@ func (r *K3kControlPlaneReconciler) reconcileUpstreamCluster(ctx context.Context
 		return nil, fmt.Errorf("failed to get current clusters for controlPlane %s/%s: %w", controlPlane.Namespace, controlPlane.Name, err)
 	}
 
-	spec := upstream.ClusterSpec{
-		Version:     controlPlane.Spec.Version,
-		Servers:     controlPlane.Spec.Servers,
-		Agents:      controlPlane.Spec.Agents,
-		ClusterCIDR: controlPlane.Spec.ClusterCIDR,
-		ServiceCIDR: controlPlane.Spec.ServiceCIDR,
-		ClusterDNS:  controlPlane.Spec.ClusterDNS,
-		ServerArgs:  controlPlane.Spec.ServerArgs,
-		AgentArgs:   controlPlane.Spec.AgentArgs,
-		TLSSANs:     controlPlane.Spec.TLSSANs,
-		Addons:      controlPlane.Spec.Addons,
-		Persistence: controlPlane.Spec.Persistence,
-		Expose:      controlPlane.Spec.Expose,
-	}
+	// Use the embedded upstream ClusterSpec directly
+	spec := controlPlane.Spec.ClusterSpec
 
 	if len(clusters) > 1 {
 		var names []string
