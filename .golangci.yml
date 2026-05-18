@@ -9,9 +9,6 @@ linters:
   - wsl_v5
   exclusions:
     rules:
-    - path: cmd
-      linters:
-      - wsl_v5
     - path: internal
       linters:
       - wsl_v5

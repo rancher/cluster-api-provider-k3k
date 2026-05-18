@@ -72,8 +72,24 @@ type K3kControlPlaneReconciler struct {
 	K3kVersion string
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *K3kControlPlaneReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager) error {
+// InitReconciler sets up the controller with the Manager.
+func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.Info("Init controlplane Reconciler")
+
+	restClientGetter, err := helm.NewRESTClientGetter(mgr.GetConfig(), mgr.GetRESTMapper())
+	if err != nil {
+		log.Error(err, "failed to set up REST client getter")
+		return err
+	}
+
+	r := &K3kControlPlaneReconciler{
+		Client:     mgr.GetClient(),
+		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k", "k3k-system"),
+		K3kVersion: k3kVersion,
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&controlplanev1.K3kControlPlane{}).
 		Complete(r)
