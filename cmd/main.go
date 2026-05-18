@@ -28,15 +28,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1alpha1"
+	upstream "github.com/rancher/k3k/pkg/apis/k3k.io/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	controlplanev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1alpha1"
-	infrastructurev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	controlplanev1beta1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
+	infrastructurev1beta1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
 	controlplanecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/controlplane"
 	infrastructurecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/infrastructure"
 	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
@@ -54,11 +54,11 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(infrastructurev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(controlplanev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(infrastructurev1beta1.AddToScheme(scheme))
+	utilruntime.Must(controlplanev1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 	utilruntime.Must(upstream.AddToScheme(scheme))
-	utilruntime.Must(clusterv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1beta2.AddToScheme(scheme))
 }
 
 func main() {

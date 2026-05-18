@@ -49,6 +49,8 @@ rules:
   - customresourcedefinitions
   verbs:
   - create
+  - get
+  - list
 - apiGroups:
   - apps
   resources:
@@ -60,9 +62,11 @@ rules:
   - cluster.x-k8s.io
   resources:
   - clusters
+  - clusters/status
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - controlplane.cluster.x-k8s.io

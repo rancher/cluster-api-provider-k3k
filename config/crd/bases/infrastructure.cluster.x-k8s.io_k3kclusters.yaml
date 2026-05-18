@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: k3kclusters.infrastructure.cluster.x-k8s.io
 spec:
   group: infrastructure.cluster.x-k8s.io
@@ -14,7 +14,7 @@ spec:
     singular: k3kcluster
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
         description: K3kCluster is the Schema for the K3kclusters API
@@ -43,21 +43,20 @@ spec:
                 description: |-
                   ControlPlaneEndpoint is the endpoint that the server can be reached at. Should not be supplied at create
                   time by the end user, the controller will fill this in when provisioning is complete.
+                minProperties: 1
                 properties:
                   host:
                     description: host is the hostname on which the API server is serving.
                     maxLength: 512
+                    minLength: 1
                     type: string
                   port:
                     description: port is the port on which the API server is serving.
                     format: int32
+                    maximum: 65535
+                    minimum: 1
                     type: integer
-                required:
-                - host
-                - port
                 type: object
-            required:
-            - controlPlaneEndpoint
             type: object
           status:
             description: Status is the current status.

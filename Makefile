@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= ghcr.io/rancher/cluster-api-provider-k3k:dev
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
@@ -174,10 +174,10 @@ clean-release: ## Remove the release folder.
 ## Tool Versions
 GOLANGCI_LINT_VERSION ?= v2.11.4
 KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
+CONTROLLER_TOOLS_VERSION ?= v0.20.0
 ENVTEST_VERSION ?= v0.0.0-20250505003155-b6c5897febe5
-ENVTEST_K8S_VERSION := 1.31.0
-GINKGO_VERSION ?= v2.27.2
+ENVTEST_K8S_VERSION := 1.35.0
+GINKGO_VERSION ?= v2.28.1
 
 KUBECTL ?= kubectl
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)

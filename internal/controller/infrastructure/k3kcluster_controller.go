@@ -24,7 +24,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	infrastructurev1alpha1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1alpha1"
+	infrastructurev1beta1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
 )
 
 // K3kClusterReconciler reconciles a K3kCluster object
@@ -56,6 +56,6 @@ func (r *K3kClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // SetupWithManager sets up the controller with the Manager.
 func (r *K3kClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrastructurev1alpha1.K3kCluster{}).
+		For(&infrastructurev1beta1.K3kCluster{}).
 		Complete(r)
 }

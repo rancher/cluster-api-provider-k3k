@@ -50,6 +50,4 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Tests
-        env:
-          IMG: "ghcr.io/rancher/controller:dev"
         run: make test-e2e

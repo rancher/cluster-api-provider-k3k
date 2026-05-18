@@ -4,4 +4,7 @@ kind: Kustomization
 resources:
 - manager.yaml
 
-images: []
+images:
+- name: controller
+  newName: ghcr.io/rancher/cluster-api-provider-k3k
+  newTag: dev

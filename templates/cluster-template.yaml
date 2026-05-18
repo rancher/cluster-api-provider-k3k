@@ -1,31 +1,26 @@
-apiVersion: cluster.x-k8s.io/v1beta1
+apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
 metadata:
   name: ${CLUSTER_NAME}
   namespace: ${NAMESPACE}
 spec:
   controlPlaneRef:
-    apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
     kind: K3kControlPlane
     name: ${CLUSTER_NAME}
-    namespace: ${NAMESPACE}
+    apiGroup: controlplane.cluster.x-k8s.io
   infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
     kind: K3kCluster
     name: ${CLUSTER_NAME}
-    namespace: ${NAMESPACE}
+    apiGroup: infrastructure.cluster.x-k8s.io
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: K3kCluster
 metadata:
   name: ${CLUSTER_NAME}
   namespace: ${NAMESPACE}
-spec:
-  controlPlaneEndpoint:
-    host: ""
-    port: 0
+spec: {}
 ---
-apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: K3kControlPlane
 metadata:
   name: ${CLUSTER_NAME}
