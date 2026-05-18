@@ -480,7 +480,7 @@ func (r *K3kControlPlaneReconciler) updateCluster(ctx context.Context, serverURL
 	// Update the CAPI Cluster's control plane endpoint
 	capiCluster = capiCluster.DeepCopy()
 	capiCluster.Spec.ControlPlaneEndpoint.Host = host
-	capiCluster.Spec.ControlPlaneEndpoint.Port = 443 // k3kCluster.Spec.ControlPlaneEndpoint.Port
+	capiCluster.Spec.ControlPlaneEndpoint.Port = k3kCluster.Spec.ControlPlaneEndpoint.Port
 
 	if err := r.Update(ctx, capiCluster); err != nil {
 		return fmt.Errorf("unable to update CAPI cluster %s with control plane endpoint: %w", capiCluster.Name, err)
