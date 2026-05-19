@@ -28,7 +28,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/rancher/k3k/pkg/controller/kubeconfig"
-	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,7 +47,6 @@ import (
 
 	controlplanev1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
 	infrastructurev1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
-	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
 )
 
 const (
@@ -68,7 +66,6 @@ type scope struct {
 type K3kControlPlaneReconciler struct {
 	client.Client
 	Host       client.Client
-	Helm       helm.Client
 	K3kVersion string
 }
 
@@ -106,7 +103,7 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;create
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;create
+//+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="",resources=nodes;nodes/proxy,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=get;list;create
@@ -151,20 +148,16 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		r.Host = hostClient
+	}
 
-		hostRESTClientGetter, err := helm.NewRESTClientGetter(config, hostClient.RESTMapper())
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create host helm RESTClientGetter: %w", err)
+	var k3kNamespace v1.Namespace
+	if err := r.Host.Get(ctx, client.ObjectKey{Name: "k3k-system"}, &k3kNamespace); err != nil {
+		if !apiError.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("unable to get k3k-system namespace: %w", err)
 		}
 
-		r.Helm = helm.New(hostRESTClientGetter, "charts/k3k", "k3k", "k3k-system")
+		log.Error(err, "couldn't find k3k-system namespace, Cluster provisioning could not work")
 	}
-
-	if err := r.ensureUpstreamChart(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to ensure upstream K3k release: %w", err)
-	}
-
-	log.Info("upstream K3k controller Helm release deployed")
 
 	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
 	if err != nil {
@@ -251,34 +244,6 @@ func (r *K3kControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
-}
-
-// ensureUpstreamChart tries to install a release of the upstream K3K chart or upgrade it if there is a new version.
-func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	release, err := r.Helm.GetRelease(ctx)
-	if err != nil {
-		if errors.Is(err, driver.ErrReleaseNotFound) {
-			if err := r.Helm.DeployLocalChart(ctx, nil); err != nil {
-				return fmt.Errorf("failed to deploy a local K3K release: %w", err)
-			}
-
-			log.Info("successfully deployed the upstream K3K release.")
-
-			return nil
-		}
-
-		return fmt.Errorf("couldn't check for the presence of a K3k release: %w", err)
-	}
-
-	log.Info("found K3k release version " + release.Chart.Metadata.Version)
-
-	if release.Chart.Metadata.Version != r.K3kVersion {
-		log.Error(helm.ErrReleaseMismatch, "K3k release version is not matching the current build. Something could break.")
-	}
-
-	return nil
 }
 
 // reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
