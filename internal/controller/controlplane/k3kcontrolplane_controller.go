@@ -75,15 +75,8 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 
 	log.Info("Init controlplane Reconciler")
 
-	restClientGetter, err := helm.NewRESTClientGetter(mgr.GetConfig(), mgr.GetRESTMapper())
-	if err != nil {
-		log.Error(err, "failed to set up REST client getter")
-		return err
-	}
-
 	r := &K3kControlPlaneReconciler{
 		Client:     mgr.GetClient(),
-		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k", "k3k-system"),
 		K3kVersion: k3kVersion,
 	}
 
