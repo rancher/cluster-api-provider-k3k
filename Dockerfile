@@ -3,8 +3,8 @@ FROM golang:1.25 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV K3K_VERSION=1.0.2
-ENV K3K_CHECKSUM=2b8431e0f8d0369e9aafb2d93f7f02f60fc39fdb8a1bcdffada70cff2e088c35
+ENV K3K_VERSION=1.1.0
+ENV K3K_CHECKSUM=251653c68d9ba40e7726d728877198f96e915451b9fc8d7e0f6d036bb19882cd
 
 WORKDIR /workspace
 
@@ -40,6 +40,6 @@ COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/charts /charts
 USER 65532:65532
 
-ENV K3K_VERSION=1.0.2
+ENV K3K_VERSION=1.1.0
 
 ENTRYPOINT ["/manager"]
