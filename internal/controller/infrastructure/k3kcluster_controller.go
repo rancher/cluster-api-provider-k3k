@@ -53,8 +53,16 @@ func (r *K3kClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *K3kClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+// InitReconciler sets up the controller with the Manager.
+func InitReconciler(ctx context.Context, mgr ctrl.Manager) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.Info("Init infrastructure Reconciler")
+
+	r := &K3kClusterReconciler{
+		Client: mgr.GetClient(),
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&infrastructurev1beta1.K3kCluster{}).
 		Complete(r)

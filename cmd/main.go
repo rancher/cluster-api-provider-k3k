@@ -37,9 +37,8 @@ import (
 
 	controlplanev1beta1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
 	infrastructurev1beta1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
-	controlplanecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/controlplane"
-	infrastructurecontroller "github.com/rancher/cluster-api-provider-k3k/internal/controller/infrastructure"
-	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
+	"github.com/rancher/cluster-api-provider-k3k/internal/controller/controlplane"
+	"github.com/rancher/cluster-api-provider-k3k/internal/controller/infrastructure"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -47,8 +46,13 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
+
+	metricsAddr          string
+	enableLeaderElection bool
+	probeAddr            string
+	secureMetrics        bool
+	enableHTTP2          bool
 )
 
 func init() {
@@ -62,11 +66,6 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
-	var enableHTTP2 bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -78,13 +77,17 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.Parse()
 
-	ctrl.SetLogger(stdr.New(log.New(os.Stdout, "", log.LstdFlags)))
+	logger := stdr.New(log.New(os.Stdout, "", log.LstdFlags))
+
+	ctrl.SetLogger(logger)
+
 	k3kVersion := os.Getenv("K3K_VERSION")
 	if k3kVersion == "" {
-		setupLog.Error(fmt.Errorf("K3K_VERSION must be set"), "unable to start manager")
+		logger.Error(fmt.Errorf("K3K_VERSION must be set"), "unable to start manager")
 		os.Exit(1)
 	}
-	setupLog.Info("Upstream K3K controller desired chart version", "K3K_VERSION", k3kVersion)
+
+	logger.Info("Upstream K3K controller desired chart version", "K3K_VERSION", k3kVersion)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -93,7 +96,8 @@ func main() {
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
+		logger.Info("disabling http/2")
+
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -130,46 +134,38 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	restClientGetter, err := helm.NewRESTClientGetter(mgr.GetConfig(), mgr.GetRESTMapper())
-	if err != nil {
-		setupLog.Error(err, "failed to set up REST client getter")
+		logger.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
 	ctx := ctrl.SetupSignalHandler()
 
-	if err = (&controlplanecontroller.K3kControlPlaneReconciler{
-		Client:     mgr.GetClient(),
-		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k", "k3k-system"),
-		K3kVersion: k3kVersion,
-	}).SetupWithManager(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "K3kControlPlane")
+	if err = controlplane.InitReconciler(ctx, mgr, k3kVersion); err != nil {
+		logger.Error(err, "unable to create controller", "controller", "K3kControlPlane")
 		os.Exit(1)
 	}
-	if err = (&infrastructurecontroller.K3kClusterReconciler{
-		Client: mgr.GetClient(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "K3kCluster")
+
+	if err = infrastructure.InitReconciler(ctx, mgr); err != nil {
+		logger.Error(err, "unable to create controller", "controller", "K3kCluster")
 		os.Exit(1)
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		logger.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		logger.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	logger.Info("starting manager")
+
 	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+		logger.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 }
