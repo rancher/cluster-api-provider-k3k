@@ -39,8 +39,6 @@ type K3kControlPlaneSpec struct {
 
 	// ClusterSpec contains the k3k cluster configuration, embedded inline from upstream.
 	// All fields from github.com/rancher/k3k/pkg/apis/k3k.io/v1beta1.ClusterSpec are available here.
-	//
-	// +required
 	upstream.ClusterSpec `json:",inline"`
 }
 

@@ -998,8 +998,6 @@ spec:
                         description: WorkerLimit specifies resource limits for agent
                           nodes.
                         type: object
-                    required:
-                    - ""
                     type: object
                 required:
                 - spec

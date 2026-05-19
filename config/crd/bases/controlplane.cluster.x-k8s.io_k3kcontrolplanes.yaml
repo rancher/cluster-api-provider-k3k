@@ -932,8 +932,6 @@ spec:
                   x-kubernetes-int-or-string: true
                 description: WorkerLimit specifies resource limits for agent nodes.
                 type: object
-            required:
-            - ""
             type: object
           status:
             description: Status is the current status of the K3k controlPlane.
