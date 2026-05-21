@@ -47,6 +47,7 @@ import (
 
 	controlplanev1 "github.com/rancher/cluster-api-provider-k3k/api/controlplane/v1beta1"
 	infrastructurev1 "github.com/rancher/cluster-api-provider-k3k/api/infrastructure/v1beta1"
+	"github.com/rancher/cluster-api-provider-k3k/internal/helm"
 )
 
 const (
@@ -66,6 +67,7 @@ type scope struct {
 type K3kControlPlaneReconciler struct {
 	client.Client
 	Host       client.Client
+	Helm       helm.Client
 	K3kVersion string
 }
 
@@ -143,13 +145,8 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.Host = hostClient
 	}
 
-	var k3kNamespace v1.Namespace
-	if err := r.Host.Get(ctx, client.ObjectKey{Name: "k3k-system"}, &k3kNamespace); err != nil {
-		if !apiError.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("unable to get k3k-system namespace: %w", err)
-		}
-
-		log.Error(err, "couldn't find k3k-system namespace, Cluster provisioning could not work")
+	if err := r.ensureK3kController(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
 	}
 
 	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
@@ -237,6 +234,26 @@ func (r *K3kControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+// ensureK3kController
+func (r *K3kControlPlaneReconciler) ensureK3kController(ctx context.Context) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	var k3kNamespace v1.Namespace
+	if err := r.Host.Get(ctx, client.ObjectKey{Name: "k3k-system"}, &k3kNamespace); err != nil {
+		if !apiError.IsNotFound(err) {
+			return fmt.Errorf("unable to get k3k-system namespace: %w", err)
+		}
+
+		log.Error(err, "k3k-system namespace not found: try to install K3k")
+
+		if err := r.Helm.InstallChart(ctx, nil); err != nil {
+			return fmt.Errorf("failed to install a K3k release: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // reconcileUpstreamCluster creates/updates the k3k cluster that the k3k controllers will recognize.
