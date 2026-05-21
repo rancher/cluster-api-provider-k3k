@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
@@ -140,6 +141,7 @@ func (c *Client) InstallChart(ctx context.Context, values map[string]any) error 
 	install.Namespace = c.namespace
 	install.CreateNamespace = true
 	install.Wait = true
+	install.Timeout = time.Minute
 
 	chartPath, err := install.LocateChart(c.chartRef, c.settings)
 	if err != nil {
@@ -152,64 +154,6 @@ func (c *Client) InstallChart(ctx context.Context, values map[string]any) error 
 	}
 
 	_, err = install.Run(chart, values)
-
-	return err
-}
-
-// DeployLocalChart creates a Helm release from a repository chart without waiting.
-func (c *Client) DeployLocalChart(ctx context.Context, values map[string]any) error {
-	logger := helmLogger(ctrl.LoggerFrom(ctx))
-
-	var cfg action.Configuration
-	if err := cfg.Init(c.restClientGetter, c.namespace, "", logger); err != nil {
-		return err
-	}
-
-	install := action.NewInstall(&cfg)
-	install.ReleaseName = c.releaseName
-	install.Namespace = c.namespace
-	install.CreateNamespace = true
-
-	chartPath, err := install.LocateChart(c.chartRef, c.settings)
-	if err != nil {
-		return fmt.Errorf("failed to locate chart %s: %w", c.chartRef, err)
-	}
-
-	chart, err := loader.Load(chartPath)
-	if err != nil {
-		return err
-	}
-
-	_, err = install.Run(chart, values)
-
-	return err
-}
-
-// UpgradeLocalChart upgrades a Helm release using a repository chart.
-// The Helm SDK doesn't allow to use a single action to either install or upgrade, unlike the CLI.
-func (c *Client) UpgradeLocalChart(ctx context.Context, values map[string]any) error {
-	logger := helmLogger(ctrl.LoggerFrom(ctx))
-
-	var cfg action.Configuration
-	if err := cfg.Init(c.restClientGetter, c.namespace, "", logger); err != nil {
-		return err
-	}
-
-	upgrade := action.NewUpgrade(&cfg)
-	upgrade.Namespace = c.namespace
-	upgrade.ReuseValues = true
-
-	chartPath, err := upgrade.LocateChart(c.chartRef, c.settings)
-	if err != nil {
-		return fmt.Errorf("failed to locate chart %s: %w", c.chartRef, err)
-	}
-
-	chart, err := loader.Load(chartPath)
-	if err != nil {
-		return err
-	}
-
-	_, err = upgrade.Run(c.releaseName, chart, values)
 
 	return err
 }

@@ -77,8 +77,21 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 
 	log.Info("Init controlplane Reconciler")
 
+	restClientGetter, err := helm.NewRESTClientGetter(mgr.GetConfig(), mgr.GetRESTMapper())
+	if err != nil {
+		log.Error(err, "failed to set up REST client getter")
+		return err
+	}
+
+	helmClient, err := helm.New(restClientGetter, "charts/k3k", "k3k", "k3k-system")
+	if err != nil {
+		log.Error(err, "failed to set up Helm client")
+		return err
+	}
+
 	r := &K3kControlPlaneReconciler{
 		Client:     mgr.GetClient(),
+		Helm:       helmClient,
 		K3kVersion: k3kVersion,
 	}
 
@@ -101,7 +114,9 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 //+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="",resources=nodes;nodes/proxy,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
+//+kubebuilder:rbac:groups="apps",resources=replicasets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=get;list;create
+//+kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=*
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -146,7 +161,7 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if err := r.ensureK3kController(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to get capi cluster owner: %w", err)
+		return ctrl.Result{}, fmt.Errorf("error installing K3k controller: %w", err)
 	}
 
 	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
@@ -251,7 +266,11 @@ func (r *K3kControlPlaneReconciler) ensureK3kController(ctx context.Context) err
 		if err := r.Helm.InstallChart(ctx, nil); err != nil {
 			return fmt.Errorf("failed to install a K3k release: %w", err)
 		}
+
+		log.Info("k3k controller installed successfully")
 	}
+
+	log.Info("k3k-system namespace found, k3k controller should be available")
 
 	return nil
 }
