@@ -12,6 +12,8 @@ rules:
   verbs:
   - create
   - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -58,6 +60,14 @@ rules:
   verbs:
   - create
   - get
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - cluster.x-k8s.io
   resources:
@@ -149,3 +159,9 @@ rules:
   - bind
   - create
   - get
+- apiGroups:
+  - scheduling.k8s.io
+  resources:
+  - priorityclasses
+  verbs:
+  - '*'

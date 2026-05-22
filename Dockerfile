@@ -3,18 +3,7 @@ FROM golang:1.25 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV K3K_VERSION=1.1.0
-ENV K3K_CHECKSUM=251653c68d9ba40e7726d728877198f96e915451b9fc8d7e0f6d036bb19882cd
-
 WORKDIR /workspace
-
-# Download and unzip the upstream K3K chart.
-RUN wget https://github.com/rancher/k3k/releases/download/chart-${K3K_VERSION}/k3k-${K3K_VERSION}.tgz && \
-    echo "${K3K_CHECKSUM}  k3k-${K3K_VERSION}.tgz" | sha256sum --check && \
-    gunzip k3k-${K3K_VERSION}.tgz && \
-    tar xvf k3k-${K3K_VERSION}.tar && \
-    mkdir -p charts && \
-    mv k3k charts/k3k
 
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -35,11 +24,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
-WORKDIR /
-COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/charts /charts
-USER 65532:65532
 
-ENV K3K_VERSION=1.1.0
+WORKDIR /
+
+COPY --from=builder /workspace/manager .
+
+USER 65532:65532
 
 ENTRYPOINT ["/manager"]

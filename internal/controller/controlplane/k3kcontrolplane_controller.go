@@ -28,7 +28,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/rancher/k3k/pkg/controller/kubeconfig"
-	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/clientcmd"
@@ -67,13 +66,12 @@ type scope struct {
 // K3kControlPlaneReconciler reconciles a K3kControlPlane object
 type K3kControlPlaneReconciler struct {
 	client.Client
-	Host       client.Client
-	Helm       helm.Client
-	K3kVersion string
+	Host client.Client
+	Helm *helm.Client
 }
 
 // InitReconciler sets up the controller with the Manager.
-func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) error {
+func InitReconciler(ctx context.Context, mgr ctrl.Manager) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.Info("Init controlplane Reconciler")
@@ -84,10 +82,20 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 		return err
 	}
 
+	helmClient, err := helm.New(ctx, restClientGetter)
+	if err != nil {
+		log.Error(err, "failed to set up Helm client")
+		return err
+	}
+
+	// Add k3k repository
+	if err := helmClient.AddRepository(ctx, helm.K3kRepoName, helm.K3kRepoURL); err != nil {
+		return fmt.Errorf("failed to add k3k repository: %w", err)
+	}
+
 	r := &K3kControlPlaneReconciler{
-		Client:     mgr.GetClient(),
-		Helm:       helm.New(restClientGetter, "charts/k3k", "k3k", "k3k-system"),
-		K3kVersion: k3kVersion,
+		Client: mgr.GetClient(),
+		Helm:   helmClient,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -106,10 +114,12 @@ func InitReconciler(ctx context.Context, mgr ctrl.Manager, k3kVersion string) er
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;create
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;create
+//+kubebuilder:rbac:groups="",resources=namespaces;serviceaccounts,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups="",resources=nodes;nodes/proxy,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create
+//+kubebuilder:rbac:groups="apps",resources=replicasets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apiextensions.k8s.io",resources=customresourcedefinitions,verbs=get;list;create
+//+kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=*
 
 // Reconcile creates a K3k Upstream cluster based on the provided spec of the K3kControlPlane.
 func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -151,20 +161,11 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		r.Host = hostClient
-
-		hostRESTClientGetter, err := helm.NewRESTClientGetter(config, hostClient.RESTMapper())
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create host helm RESTClientGetter: %w", err)
-		}
-
-		r.Helm = helm.New(hostRESTClientGetter, "charts/k3k", "k3k", "k3k-system")
 	}
 
-	if err := r.ensureUpstreamChart(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to ensure upstream K3k release: %w", err)
+	if err := r.ensureK3kController(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error installing K3k controller: %w", err)
 	}
-
-	log.Info("upstream K3k controller Helm release deployed")
 
 	cluster, err := capiutil.GetOwnerCluster(ctx, r, k3kControlPlane.ObjectMeta)
 	if err != nil {
@@ -173,8 +174,9 @@ func (r *K3kControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if cluster == nil {
 		// capi cluster owner may not be set immediately, but we don't want to process the cluster until it is
-		log.Info("K3kControlPlane did not have a capi cluster owner", "controlPlane", k3kControlPlane.Name)
-		return ctrl.Result{}, fmt.Errorf("CAPI cluster owner not yet set for control plane %q", k3kControlPlane.Name)
+		log.Info("CAPI cluster owner not yet set for K3kControlPlane", "controlPlane", k3kControlPlane.Name)
+
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	scope := &scope{
@@ -198,12 +200,19 @@ func (r *K3kControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *
 	if upstreamCluster == nil {
 		return ctrl.Result{}, fmt.Errorf("controlplane wasn't deleting, but we didn't reconcile the cluster")
 	}
+
 	scope.Info("Reconciled upstream cluster for controlPlane", "upstreamCluster", upstreamCluster, "controlPlane", scope.k3kControlPlane.Name)
 
 	config, err := r.getKubeconfig(ctx, upstreamCluster)
 	if err != nil {
-		scope.Error(err, "Hard failure when getting kubeconfig for cluster", "clusterName", upstreamCluster.Name)
-		return ctrl.Result{}, fmt.Errorf("unable to get kubeconfig secret")
+		if apiError.IsNotFound(err) {
+			scope.Info("Kubeconfig for upstream cluster not ready yet", "clusterName", upstreamCluster.Name)
+			return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		scope.Error(err, "failure getting kubeconfig for cluster", "clusterName", upstreamCluster.Name)
+
+		return ctrl.Result{}, fmt.Errorf("unable to get kubeconfig secret: %w", err)
 	}
 
 	if err := r.createKubeconfigSecret(ctx, config, scope.k3kControlPlane); err != nil {
@@ -253,30 +262,26 @@ func (r *K3kControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *
 	return ctrl.Result{}, nil
 }
 
-// ensureUpstreamChart tries to install a release of the upstream K3K chart or upgrade it if there is a new version.
-func (r *K3kControlPlaneReconciler) ensureUpstreamChart(ctx context.Context) error {
+// ensureK3kController
+func (r *K3kControlPlaneReconciler) ensureK3kController(ctx context.Context) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	release, err := r.Helm.GetRelease(ctx)
-	if err != nil {
-		if errors.Is(err, driver.ErrReleaseNotFound) {
-			if err := r.Helm.DeployLocalChart(ctx, nil); err != nil {
-				return fmt.Errorf("failed to deploy a local K3K release: %w", err)
-			}
-
-			log.Info("successfully deployed the upstream K3K release.")
-
-			return nil
+	var k3kNamespace v1.Namespace
+	if err := r.Host.Get(ctx, client.ObjectKey{Name: "k3k-system"}, &k3kNamespace); err != nil {
+		if !apiError.IsNotFound(err) {
+			return fmt.Errorf("unable to get k3k-system namespace: %w", err)
 		}
 
-		return fmt.Errorf("couldn't check for the presence of a K3k release: %w", err)
+		log.Error(err, "k3k-system namespace not found: try to install K3k")
+
+		if err := r.Helm.InstallChart(ctx, nil); err != nil {
+			return fmt.Errorf("failed to install a K3k release: %w", err)
+		}
+
+		log.Info("k3k controller installed successfully")
 	}
 
-	log.Info("found K3k release version " + release.Chart.Metadata.Version)
-
-	if release.Chart.Metadata.Version != r.K3kVersion {
-		log.Error(helm.ErrReleaseMismatch, "K3k release version is not matching the current build. Something could break.")
-	}
+	log.V(1).Info("k3k-system namespace found, k3k controller should be available")
 
 	return nil
 }
