@@ -19,7 +19,6 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 
@@ -81,14 +80,6 @@ func main() {
 
 	ctrl.SetLogger(logger)
 
-	k3kVersion := os.Getenv("K3K_VERSION")
-	if k3kVersion == "" {
-		logger.Error(fmt.Errorf("K3K_VERSION must be set"), "unable to start manager")
-		os.Exit(1)
-	}
-
-	logger.Info("Upstream K3K controller desired chart version", "K3K_VERSION", k3kVersion)
-
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancelation and
@@ -140,7 +131,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	if err = controlplane.InitReconciler(ctx, mgr, k3kVersion); err != nil {
+	if err = controlplane.InitReconciler(ctx, mgr); err != nil {
 		logger.Error(err, "unable to create controller", "controller", "K3kControlPlane")
 		os.Exit(1)
 	}
