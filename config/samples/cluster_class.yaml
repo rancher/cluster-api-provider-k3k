@@ -389,7 +389,4 @@ metadata:
   name: k3kclustertemplate-sample
 spec:
   template:
-    spec:
-      controlPlaneEndpoint:
-        host: placeholder
-        port: 443
+    spec: {}
