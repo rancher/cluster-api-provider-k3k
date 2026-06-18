@@ -39,7 +39,7 @@ spec:
           type: integer
           default: 1
     - name: token
-      required: true
+      required: false
       schema:
         openAPIV3Schema:
           description: Token is the token used to join the worker nodes to the cluster.
@@ -130,8 +130,6 @@ spec:
           required:
           - ingressClassName
           type: object
-          default:
-            ingressClassName: "traefik"
     - name: exposeLoadBalancer
       required: false
       schema:
@@ -358,7 +356,7 @@ spec:
           variable: hostKubeconfig
 ---
 # once created, this object will be owned by the cluster class
-apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: K3kControlPlaneTemplate
 metadata:
   labels:
@@ -373,15 +371,13 @@ spec:
     spec:
       servers: 1
       agents: 3
-      token: someexamplereplaceme
       version: v1.31.1-k3s1
       serverArgs:
         - "--write-kubeconfig-mode=777"
-      expose:
-        nodePort: {}
+      expose: {}
 ---
 # once created, this object will be owned by the cluster class
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: K3kClusterTemplate
 metadata:
   labels:
